@@ -76,7 +76,7 @@ Trading gold (XAUUSD) involves significant risk. Past performance is not indicat
 
 The new defaults are intended to be safer for a **small account such as $30**. They scale risk from equity, keep a free-margin buffer, and focus trading on the London / New York overlap session.
 
-They still do not guarantee growth and do not protect against slippage, gap risk, or consecutive losses.
+These settings still do not guarantee growth and do not protect against slippage, gap risk, or consecutive losses.
 
 ---
 

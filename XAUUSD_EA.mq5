@@ -228,20 +228,14 @@ double GetRiskAmountUSD()
   {
    double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
    double riskPct = PercentOf(equity, InpRiskPercent);
-   double riskUSD = 0.0;
+
+   if(InpRiskPercent > 0 && InpRiskUSD > 0)
+      return MathMin(riskPct, InpRiskUSD);
 
    if(InpRiskPercent > 0)
-      riskUSD = riskPct;
+      return riskPct;
 
-   if(InpRiskUSD > 0)
-     {
-      if(riskUSD <= 0)
-         riskUSD = InpRiskUSD;
-      else if(InpRiskUSD < riskUSD)
-         riskUSD = InpRiskUSD;
-     }
-
-   return riskUSD;
+   return InpRiskUSD;
   }
 
 //+------------------------------------------------------------------+
