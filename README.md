@@ -9,7 +9,7 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 
 | Component | Description |
 |-----------|-------------|
-| Entry | Fast EMA (21) crosses Slow EMA (50) and stays confirmed for the configured signal bars |
+| Entry | Fast EMA (21) crosses Slow EMA (50) and remains crossed throughout the configured signal-bar window (including the crossover bar) |
 | Trend filter | Price must be on the correct side of the 200 EMA |
 | Stop Loss | 1.2 × ATR(14) from entry |
 | Take Profit | 2.4 × ATR(14) from entry (≈ 1:2 RR) |

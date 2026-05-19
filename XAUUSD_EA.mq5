@@ -220,7 +220,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   int crossBar    = InpSignalBars;
+   int oldestConfirmationBar = InpSignalBars;
    double trendNow = trendEMABuf[1];
 
    // Trend filter: price (close) must be above/below 200 EMA
@@ -230,12 +230,12 @@ int GetSignal()
    bool bearTrend = (closePrice < trendNow);
 
    // EMA crossover must happen on the confirmation window's oldest bar and remain intact.
-   bool bullCross = (fastEMABuf[crossBar + 1] <= slowEMABuf[crossBar + 1]) &&
-                    (fastEMABuf[crossBar] > slowEMABuf[crossBar]);
-   bool bearCross = (fastEMABuf[crossBar + 1] >= slowEMABuf[crossBar + 1]) &&
-                    (fastEMABuf[crossBar] < slowEMABuf[crossBar]);
+   bool bullCross = (fastEMABuf[oldestConfirmationBar + 1] <= slowEMABuf[oldestConfirmationBar + 1]) &&
+                    (fastEMABuf[oldestConfirmationBar] > slowEMABuf[oldestConfirmationBar]);
+   bool bearCross = (fastEMABuf[oldestConfirmationBar + 1] >= slowEMABuf[oldestConfirmationBar + 1]) &&
+                    (fastEMABuf[oldestConfirmationBar] < slowEMABuf[oldestConfirmationBar]);
 
-   for(int i = crossBar - 1; i >= 1 && (bullCross || bearCross); i--)
+   for(int i = oldestConfirmationBar - 1; i >= 1; i--)
      {
       if(bullCross && fastEMABuf[i] <= slowEMABuf[i])
          bullCross = false;
