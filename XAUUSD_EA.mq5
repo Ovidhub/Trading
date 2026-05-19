@@ -220,7 +220,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   int oldestConfirmationBar = InpSignalBars;
+   int crossoverBarIndex = InpSignalBars;
    double trendNow = trendEMABuf[1];
 
    // Trend filter: price (close) must be above/below 200 EMA
@@ -230,21 +230,33 @@ int GetSignal()
    bool bearTrend = (closePrice < trendNow);
 
    // EMA crossover must happen on the confirmation window's oldest bar and remain intact.
-   bool bullCross = (fastEMABuf[oldestConfirmationBar + 1] <= slowEMABuf[oldestConfirmationBar + 1]) &&
-                    (fastEMABuf[oldestConfirmationBar] > slowEMABuf[oldestConfirmationBar]);
-   bool bearCross = (fastEMABuf[oldestConfirmationBar + 1] >= slowEMABuf[oldestConfirmationBar + 1]) &&
-                    (fastEMABuf[oldestConfirmationBar] < slowEMABuf[oldestConfirmationBar]);
+   bool bullCross = (fastEMABuf[crossoverBarIndex + 1] <= slowEMABuf[crossoverBarIndex + 1]) &&
+                    (fastEMABuf[crossoverBarIndex] > slowEMABuf[crossoverBarIndex]);
+   bool bearCross = (fastEMABuf[crossoverBarIndex + 1] >= slowEMABuf[crossoverBarIndex + 1]) &&
+                    (fastEMABuf[crossoverBarIndex] < slowEMABuf[crossoverBarIndex]);
 
-   for(int i = oldestConfirmationBar - 1; i >= 1; i--)
+   if(bullCross)
      {
-      if(bullCross && fastEMABuf[i] <= slowEMABuf[i])
-         bullCross = false;
+      for(int i = crossoverBarIndex - 1; i >= 1; i--)
+        {
+         if(fastEMABuf[i] <= slowEMABuf[i])
+           {
+            bullCross = false;
+            break;
+           }
+        }
+     }
 
-      if(bearCross && fastEMABuf[i] >= slowEMABuf[i])
-         bearCross = false;
-
-      if(!bullCross && !bearCross)
-         break;
+   if(bearCross)
+     {
+      for(int i = crossoverBarIndex - 1; i >= 1; i--)
+        {
+         if(fastEMABuf[i] >= slowEMABuf[i])
+           {
+            bearCross = false;
+            break;
+           }
+        }
      }
 
    if(bullCross && bullTrend) return 1;
