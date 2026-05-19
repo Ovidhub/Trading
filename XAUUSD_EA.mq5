@@ -165,8 +165,7 @@ void OnTick()
    if(signal == 0)
      {
       if(InpDebugLog)
-         // Signal requires an EMA crossover aligned with the trend EMA filter.
-         PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
+         PrintFormat("NO SIGNAL: need EMA crossover aligned with trend filter | fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
                      fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
                      trendEMABuf[1], iClose(_Symbol, InpTimeframe, 1));
       return;
