@@ -75,10 +75,16 @@ int OnInit()
    handleATR      = iATR(_Symbol, InpTimeframe, InpATRPeriod);
 
    if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
-      handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
+       handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
+      {
+       Print("ERROR: Failed to create indicator handles.");
+       return INIT_FAILED;
+      }
+
+   if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
      {
-      Print("ERROR: Failed to create indicator handles.");
-      return INIT_FAILED;
+      Print("ERROR: Set InpRiskUSD or InpRiskPercent above zero.");
+      return INIT_PARAMETERS_INCORRECT;
      }
 
    ArraySetAsSeries(fastEMABuf,  true);
@@ -139,9 +145,10 @@ void OnTick()
    double atr = atrBuf[1];
    if(atr <= 0) return;
 
-   double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+    double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+    double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+    if(point <= 0) return;
 
    if(signal == 1) // BUY
      {
@@ -150,12 +157,12 @@ void OnTick()
       double slPoints = (ask - sl) / point;
       double lots     = CalculateLotSize(slPoints);
       if(lots <= 0) return;
-      if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
-      if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
-         PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
-      else
-         Print("BUY failed: ", Trade.ResultRetcode(), " - ", Trade.ResultRetcodeDescription());
-     }
+       if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
+       if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
+          PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
+       else
+          PrintTradeError("BUY");
+      }
     else if(signal == -1) // SELL
       {
        double sl     = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
@@ -163,12 +170,12 @@ void OnTick()
        double slPoints = (sl - bid) / point;
        double lots     = CalculateLotSize(slPoints);
        if(lots <= 0) return;
-       if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
-       if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
-          PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
-       else
-          Print("SELL failed: ", Trade.ResultRetcode(), " - ", Trade.ResultRetcodeDescription());
-      }
+        if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
+        if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
+           PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
+        else
+           PrintTradeError("SELL");
+       }
   }
 
 //+------------------------------------------------------------------+
@@ -213,9 +220,12 @@ double GetRiskAmountUSD()
   {
    double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
    double riskPct = equity * (InpRiskPercent / 100.0);
-   double riskUSD = MathMin(InpRiskUSD, riskPct);
+   double riskUSD = 0.0;
 
-   if(riskUSD <= 0)
+   if(InpRiskPercent > 0)
+      riskUSD = riskPct;
+
+   if(InpRiskUSD > 0 && (riskUSD <= 0 || InpRiskUSD < riskUSD))
       riskUSD = InpRiskUSD;
 
    return riskUSD;
@@ -368,9 +378,21 @@ bool IsInSession()
 //+------------------------------------------------------------------+
 void PrintTradeInfo(string dir, double lots, double price, double sl, double tp, double atr)
   {
-   double riskUSD = EstimateRiskUSD(lots, MathAbs(price - sl) / SymbolInfoDouble(_Symbol, SYMBOL_POINT));
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double riskUSD = 0.0;
+   if(point > 0)
+      riskUSD = EstimateRiskUSD(lots, MathAbs(price - sl) / point);
+
    Print(StringFormat(
-       "[TRADE] %s | Lots: %.2f | Entry: %.2f | SL: %.2f | TP: %.2f | ATR: %.2f | Risk: $%.2f",
-       dir, lots, price, sl, tp, atr, riskUSD));
+        "[TRADE] %s | Lots: %.2f | Entry: %.2f | SL: %.2f | TP: %.2f | ATR: %.2f | Risk: $%.2f",
+        dir, lots, price, sl, tp, atr, riskUSD));
+  }
+
+//+------------------------------------------------------------------+
+//| Log trade send failures                                           |
+//+------------------------------------------------------------------+
+void PrintTradeError(string dir)
+  {
+   Print(dir, " failed: ", Trade.ResultRetcode(), " - ", Trade.ResultRetcodeDescription());
   }
 //+------------------------------------------------------------------+
