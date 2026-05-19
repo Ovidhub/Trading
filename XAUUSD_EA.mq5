@@ -44,6 +44,9 @@ input group "=== Signal Settings ==="
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
 input int      InpSignalBars    = 2;        // Bars to confirm crossover
 
+input group "=== Debug ==="
+input bool     InpDebugLog      = false;    // Print per-bar diagnostics to Journal
+
 //--- Global objects
 CTrade         Trade;
 CPositionInfo  PosInfo;
@@ -67,7 +70,7 @@ int OnInit()
   {
    Trade.SetExpertMagicNumber(InpMagicNumber);
    Trade.SetDeviationInPoints(30);
-   Trade.SetTypeFilling(ORDER_FILLING_FOK);
+   Trade.SetTypeFilling(ORDER_FILLING_IOC);
 
    handleFastEMA  = iMA(_Symbol, InpTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
    handleSlowEMA  = iMA(_Symbol, InpTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
@@ -124,23 +127,49 @@ void OnTick()
    long spreadPoints = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
    if(spreadPoints > InpMaxSpreadPts)
      {
-      Print("Spread too wide: ", spreadPoints, " pts — skipping.");
+      if(InpDebugLog)
+         Print("BLOCKED: spread=", spreadPoints, " pts (max ", InpMaxSpreadPts, ")");
       return;
      }
 
    // Session filter
    if(InpTradeSession && !IsInSession())
+     {
+      if(InpDebugLog)
+        {
+         MqlDateTime dt; TimeToStruct(TimeGMT(), dt);
+         Print("BLOCKED: outside session UTC hour=", dt.hour,
+               " (allowed ", InpSessionStart, "-", InpSessionEnd, ")");
+        }
       return;
+     }
 
    // Refresh indicator data
-   if(!RefreshBuffers()) return;
+   if(!RefreshBuffers())
+     {
+      if(InpDebugLog)
+         Print("BLOCKED: RefreshBuffers failed — not enough history yet.");
+      return;
+     }
 
    // Skip if already holding a position on this symbol/magic
-   if(HasOpenPosition()) return;
+   if(HasOpenPosition())
+     {
+      if(InpDebugLog)
+         Print("BLOCKED: already in position.");
+      return;
+     }
 
    // Evaluate signal
    int signal = GetSignal();
-   if(signal == 0) return;
+   if(signal == 0)
+     {
+      if(InpDebugLog)
+         PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
+                     fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
+                     trendEMABuf[1], iClose(_Symbol, InpTimeframe, 1));
+      return;
+     }
 
    double atr = atrBuf[1];
    if(atr <= 0) return;
