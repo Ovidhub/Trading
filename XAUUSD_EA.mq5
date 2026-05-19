@@ -7,7 +7,7 @@
 //|  Symbol    : XAUUSD                                               |
 //+------------------------------------------------------------------+
 #property copyright "Ovidhub/Trading"
-#property version   "1.10"
+#property version   "1.11"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -42,7 +42,7 @@ input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
 input group "=== Signal Settings ==="
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
-input int      InpSignalBars    = 2;        // Bars to confirm crossover
+input int      InpSignalBars    = 2;        // Closed bars to confirm crossover after the cross
 
 input group "=== Debug ==="
 input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
@@ -85,10 +85,16 @@ int OnInit()
       }
 
    if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
-     {
+      {
       Print("ERROR: At least one of InpRiskUSD or InpRiskPercent must be greater than zero.");
       return INIT_PARAMETERS_INCORRECT;
-     }
+      }
+
+   if(InpSignalBars < 1)
+      {
+      Print("ERROR: InpSignalBars must be at least 1.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
    ArraySetAsSeries(fastEMABuf,  true);
    ArraySetAsSeries(slowEMABuf,  true);
@@ -214,17 +220,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   // Need at least InpSignalBars+1 bars of history
-   int barsNeeded = InpSignalBars + 2;
-
-   // Current bar (index 1 = last closed bar)
-   double fastNow  = fastEMABuf[1];
-   double slowNow  = slowEMABuf[1];
+   int confirmBars = MathMax(InpSignalBars, 1);
+   int crossBar    = confirmBars;
    double trendNow = trendEMABuf[1];
-
-   // Previous bar
-   double fastPrev = fastEMABuf[2];
-   double slowPrev = slowEMABuf[2];
 
    // Trend filter: price (close) must be above/below 200 EMA
    double closePrice = iClose(_Symbol, InpTimeframe, 1);
@@ -232,10 +230,20 @@ int GetSignal()
    bool bullTrend = (closePrice > trendNow);
    bool bearTrend = (closePrice < trendNow);
 
-   // EMA crossover: fast crosses above slow
-   bool bullCross = (fastPrev <= slowPrev) && (fastNow > slowNow);
-   // EMA crossover: fast crosses below slow
-   bool bearCross = (fastPrev >= slowPrev) && (fastNow < slowNow);
+   // EMA crossover must happen on the confirmation window's oldest bar and remain intact.
+   bool bullCross = (fastEMABuf[crossBar + 1] <= slowEMABuf[crossBar + 1]) &&
+                    (fastEMABuf[crossBar] > slowEMABuf[crossBar]);
+   bool bearCross = (fastEMABuf[crossBar + 1] >= slowEMABuf[crossBar + 1]) &&
+                    (fastEMABuf[crossBar] < slowEMABuf[crossBar]);
+
+   for(int i = crossBar - 1; i >= 1 && (bullCross || bearCross); i--)
+     {
+      if(bullCross && fastEMABuf[i] <= slowEMABuf[i])
+         bullCross = false;
+
+      if(bearCross && fastEMABuf[i] >= slowEMABuf[i])
+         bearCross = false;
+     }
 
    if(bullCross && bullTrend) return 1;
    if(bearCross && bearTrend) return -1;
