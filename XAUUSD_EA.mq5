@@ -45,7 +45,7 @@ input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
 input int      InpSignalBars    = 2;        // Bars to confirm crossover
 
 input group "=== Debug ==="
-input bool     InpDebugLog      = false;    // Print per-bar diagnostics to Journal
+input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
 
 //--- Global objects
 CTrade         Trade;
@@ -165,6 +165,7 @@ void OnTick()
    if(signal == 0)
      {
       if(InpDebugLog)
+         // Signal requires an EMA crossover aligned with the trend EMA filter.
          PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
                      fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
                      trendEMABuf[1], iClose(_Symbol, InpTimeframe, 1));
