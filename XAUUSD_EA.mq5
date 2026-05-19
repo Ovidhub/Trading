@@ -220,8 +220,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   int confirmBars = MathMax(InpSignalBars, 1);
-   int crossBar    = confirmBars;
+   int crossBar    = InpSignalBars;
    double trendNow = trendEMABuf[1];
 
    // Trend filter: price (close) must be above/below 200 EMA
