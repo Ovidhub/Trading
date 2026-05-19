@@ -225,8 +225,13 @@ double GetRiskAmountUSD()
    if(InpRiskPercent > 0)
       riskUSD = riskPct;
 
-   if(InpRiskUSD > 0 && (riskUSD <= 0 || InpRiskUSD < riskUSD))
-      riskUSD = InpRiskUSD;
+   if(InpRiskUSD > 0)
+     {
+      if(riskUSD <= 0)
+         riskUSD = InpRiskUSD;
+      else if(InpRiskUSD < riskUSD)
+         riskUSD = InpRiskUSD;
+     }
 
    return riskUSD;
   }

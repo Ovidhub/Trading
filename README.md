@@ -72,7 +72,7 @@ If the calculated lot is below the broker minimum, the EA can still use the mini
 
 ## Risk Warning
 
-Trading gold (XAUUSD) involves significant risk. Past performance is not indicative of future results. Always test on a **demo account** before going live. The new defaults are intended to be safer for a **small account such as $30**, but they do not guarantee growth and do not protect against slippage, gap risk, or consecutive losses.
+Trading gold (XAUUSD) involves significant risk. Past performance is not indicative of future results. Always test on a **demo account** before going live. The new defaults are intended to be safer for a **small account such as $30** because they scale risk from equity, keep a free-margin buffer, and focus trading on the highest-liquidity XAUUSD session. They still do not guarantee growth and do not protect against slippage, gap risk, or consecutive losses.
 
 ---
 
