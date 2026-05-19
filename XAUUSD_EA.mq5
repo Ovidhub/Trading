@@ -42,7 +42,7 @@ input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
 input group "=== Signal Settings ==="
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
-input int      InpSignalBars    = 2;        // Closed bars to confirm crossover after the cross
+input int      InpSignalBars    = 2;        // Closed-bar confirmation window, including the crossover bar
 
 input group "=== Debug ==="
 input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
@@ -243,6 +243,9 @@ int GetSignal()
 
       if(bearCross && fastEMABuf[i] >= slowEMABuf[i])
          bearCross = false;
+
+      if(!bullCross && !bearCross)
+         break;
      }
 
    if(bullCross && bullTrend) return 1;

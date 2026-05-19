@@ -56,7 +56,7 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 | `InpSessionStart` | `12` | Session start (UTC hour) |
 | `InpSessionEnd` | `17` | Session end (UTC hour) |
 | `InpTimeframe` | `M15` | Signal timeframe |
-| `InpSignalBars` | `2` | Closed bars that must hold after the EMA crossover before entry |
+| `InpSignalBars` | `2` | Size of the closed-bar confirmation window for the EMA crossover, including the crossover bar |
 
 ---
 
