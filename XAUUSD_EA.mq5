@@ -2,12 +2,12 @@
 //|                                                    XAUUSD_EA.mq5 |
 //|                                          Ovidhub/Trading (2026)  |
 //|  Strategy : EMA trend filter + ATR-based SL/TP                   |
-//|  Risk      : Fixed $3 per trade (auto lot sizing)                 |
+//|  Risk      : Balance-aware risk cap for small accounts            |
 //|  Platform  : Deriv / MetaTrader 5                                 |
 //|  Symbol    : XAUUSD                                               |
 //+------------------------------------------------------------------+
 #property copyright "Ovidhub/Trading"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -15,9 +15,13 @@
 
 //--- Input parameters
 input group "=== Risk Management ==="
-input double   InpRiskUSD       = 3.0;      // Risk per trade (USD)
+input double   InpRiskUSD       = 3.0;      // Max risk cap per trade (USD)
+input double   InpRiskPercent   = 5.0;      // Risk as % of equity (used up to USD cap)
 input double   InpMaxLotSize    = 5.0;      // Maximum lot size cap
 input double   InpMinLotSize    = 0.01;     // Minimum lot size
+input bool     InpAllowMinLotFallback = true; // Allow broker min lot when risk stays reasonable
+input double   InpMaxMinLotRiskPct = 6.0;  // Max equity risk allowed for min-lot fallback
+input double   InpMinFreeMarginUSD = 10.0; // Keep this free margin after entry
 
 input group "=== EMA Settings ==="
 input int      InpFastEMA       = 21;       // Fast EMA period
@@ -26,22 +30,22 @@ input int      InpTrendEMA      = 200;      // Trend EMA period
 
 input group "=== ATR Settings ==="
 input int      InpATRPeriod     = 14;       // ATR period
-input double   InpSLMultiplier  = 1.5;      // SL = ATR × multiplier
-input double   InpTPMultiplier  = 3.0;      // TP = ATR × multiplier (RR ≈ 1:2)
+input double   InpSLMultiplier  = 1.2;      // SL = ATR × multiplier
+input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:2)
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 100;      // Max allowed spread (points)
-input bool     InpTradeSession  = true;     // Filter by London/NY session
-input int      InpSessionStart  = 7;        // Session start hour (UTC)
-input int      InpSessionEnd    = 20;       // Session end hour (UTC)
+input int      InpMaxSpreadPts  = 35;       // Max allowed spread (points)
+input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
+input int      InpSessionStart  = 12;       // Session start hour (UTC)
+input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
 input group "=== Signal Settings ==="
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
 input int      InpSignalBars    = 2;        // Bars to confirm crossover
 
 input group "=== Debug ==="
-input bool     InpDebugLog      = false;    // Print per-bar diagnostics to Journal
+input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
 
 //--- Global objects
 CTrade         Trade;
@@ -74,10 +78,16 @@ int OnInit()
    handleATR      = iATR(_Symbol, InpTimeframe, InpATRPeriod);
 
    if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
-      handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
+       handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
+      {
+       Print("ERROR: Failed to create indicator handles.");
+       return INIT_FAILED;
+      }
+
+   if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
      {
-      Print("ERROR: Failed to create indicator handles.");
-      return INIT_FAILED;
+      Print("ERROR: At least one of InpRiskUSD or InpRiskPercent must be greater than zero.");
+      return INIT_PARAMETERS_INCORRECT;
      }
 
    ArraySetAsSeries(fastEMABuf,  true);
@@ -85,7 +95,9 @@ int OnInit()
    ArraySetAsSeries(trendEMABuf, true);
    ArraySetAsSeries(atrBuf,      true);
 
-   Print("XAUUSD EA initialised. Risk per trade: $", DoubleToString(InpRiskUSD, 2));
+   Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
+         " | Risk %: ", DoubleToString(InpRiskPercent, 2),
+         " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
    return INIT_SUCCEEDED;
   }
 
@@ -153,6 +165,7 @@ void OnTick()
    if(signal == 0)
      {
       if(InpDebugLog)
+         // Signal requires an EMA crossover aligned with the trend EMA filter.
          PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
                      fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
                      trendEMABuf[1], iClose(_Symbol, InpTimeframe, 1));
@@ -165,26 +178,33 @@ void OnTick()
    double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   if(point <= 0) return;
 
    if(signal == 1) // BUY
      {
       double sl     = NormalizeDouble(ask - InpSLMultiplier * atr, _Digits);
       double tp     = NormalizeDouble(ask + InpTPMultiplier * atr, _Digits);
-      double slPips = (ask - sl) / point;
-      double lots   = CalculateLotSize(slPips);
+      double slInPoints = (ask - sl) / point;
+      double lots       = CalculateLotSize(slInPoints);
       if(lots <= 0) return;
-      Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY");
-      PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
-     }
+      if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
+      if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
+         PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
+      else
+         PrintTradeError("BUY");
+      }
    else if(signal == -1) // SELL
      {
-      double sl     = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
-      double tp     = NormalizeDouble(bid - InpTPMultiplier * atr, _Digits);
-      double slPips = (sl - bid) / point;
-      double lots   = CalculateLotSize(slPips);
+      double sl       = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
+      double tp       = NormalizeDouble(bid - InpTPMultiplier * atr, _Digits);
+      double slInPoints = (sl - bid) / point;
+      double lots       = CalculateLotSize(slInPoints);
       if(lots <= 0) return;
-      Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL");
-      PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
+      if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
+      if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
+         PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
+      else
+         PrintTradeError("SELL");
      }
   }
 
@@ -224,37 +244,133 @@ int GetSignal()
   }
 
 //+------------------------------------------------------------------+
-//| Auto lot size based on fixed USD risk and SL distance            |
+//| Helper: calculate percentage amount                              |
+//+------------------------------------------------------------------+
+double PercentOf(double value, double percent)
+  {
+   return value * (percent / 100.0);
+  }
+
+//+------------------------------------------------------------------+
+//| Auto lot size based on adaptive risk and SL distance             |
+//+------------------------------------------------------------------+
+double GetRiskAmountUSD()
+  {
+   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
+   double riskPct = PercentOf(equity, InpRiskPercent);
+
+   if(InpRiskPercent > 0 && InpRiskUSD > 0)
+      return MathMin(riskPct, InpRiskUSD);
+
+   if(InpRiskPercent > 0)
+      return riskPct;
+
+   return InpRiskUSD;
+  }
+
+//+------------------------------------------------------------------+
+//| Estimate trade risk in USD                                        |
+//+------------------------------------------------------------------+
+double EstimateRiskUSD(double lots, double slInPoints)
+  {
+   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   double tickSize  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   double point     = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+   if(tickValue <= 0 || tickSize <= 0 || point <= 0)
+      return 0;
+
+   // Repeat the same point-value calculation used in lot sizing so the
+   // logged/validated USD risk matches the sizing formula.
+   double valuePerPointPerLot = tickValue * (point / tickSize);
+   return lots * slInPoints * valuePerPointPerLot;
+  }
+
+//+------------------------------------------------------------------+
+//| Auto lot size based on adaptive risk and SL distance             |
 //+------------------------------------------------------------------+
 double CalculateLotSize(double slInPoints)
   {
    if(slInPoints <= 0) return 0;
 
+   double riskUSD   = GetRiskAmountUSD();
    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
    double tickSize  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    double point     = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
 
-   if(tickValue <= 0 || tickSize <= 0) return 0;
+   if(riskUSD <= 0 || tickValue <= 0 || tickSize <= 0 || point <= 0) return 0;
 
    // Value per point per lot
    double valuePerPointPerLot = tickValue * (point / tickSize);
 
    // Risk amount ÷ (SL in points × value per point per lot)
-   double lots = InpRiskUSD / (slInPoints * valuePerPointPerLot);
+   double lots = riskUSD / (slInPoints * valuePerPointPerLot);
 
    // Round to lot step
    double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   if(lotStep <= 0) return 0;
    lots = MathFloor(lots / lotStep) * lotStep;
-
-   lots = MathMax(lots, InpMinLotSize);
-   lots = MathMin(lots, InpMaxLotSize);
 
    double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
    double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
-   lots = MathMax(lots, minLot);
+   minLot = MathMax(minLot, InpMinLotSize);
+   maxLot = MathMin(maxLot, InpMaxLotSize);
+
+   if(lots < minLot)
+     {
+      if(!InpAllowMinLotFallback)
+        {
+         Print("Skipped: calculated lot size below broker minimum.");
+         return 0;
+        }
+
+      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      double minLotRiskUSD = EstimateRiskUSD(minLot, slInPoints);
+      double allowedMinLotRiskUSD = PercentOf(equity, InpMaxMinLotRiskPct);
+
+      if(minLotRiskUSD > allowedMinLotRiskUSD)
+        {
+         Print("Skipped: min lot risk too high for equity. Risk=", DoubleToString(minLotRiskUSD, 2),
+               " USD | Allowed=", DoubleToString(allowedMinLotRiskUSD, 2), " USD");
+         return 0;
+        }
+
+      lots = minLot;
+     }
+
    lots = MathMin(lots, maxLot);
 
    return NormalizeDouble(lots, 2);
+  }
+
+//+------------------------------------------------------------------+
+//| Check margin before sending order                                 |
+//+------------------------------------------------------------------+
+bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
+  {
+   double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+
+   if(freeMargin <= InpMinFreeMarginUSD)
+     {
+      Print("Skipped: free margin too low. Free margin=", DoubleToString(freeMargin, 2), " USD");
+      return false;
+     }
+
+   double marginRequired = 0.0;
+   if(!OrderCalcMargin(orderType, _Symbol, lots, price, marginRequired))
+     {
+      Print("Skipped: failed to calculate margin for trade.");
+      return false;
+     }
+
+   if((freeMargin - marginRequired) < InpMinFreeMarginUSD)
+     {
+      Print("Skipped: insufficient free margin buffer. Required=", DoubleToString(marginRequired, 2),
+            " USD | Free margin=", DoubleToString(freeMargin, 2), " USD");
+      return false;
+     }
+
+   return true;
   }
 
 //+------------------------------------------------------------------+
@@ -287,7 +403,7 @@ bool HasOpenPosition()
   }
 
 //+------------------------------------------------------------------+
-//| Session filter: only trade during London/NY overlap              |
+//| Session filter: trade during strongest XAUUSD liquidity window   |
 //+------------------------------------------------------------------+
 bool IsInSession()
   {
@@ -301,8 +417,21 @@ bool IsInSession()
 //+------------------------------------------------------------------+
 void PrintTradeInfo(string dir, double lots, double price, double sl, double tp, double atr)
   {
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double riskUSD = 0.0;
+   if(point > 0)
+      riskUSD = EstimateRiskUSD(lots, MathAbs(price - sl) / point);
+
    Print(StringFormat(
-      "[TRADE] %s | Lots: %.2f | Entry: %.2f | SL: %.2f | TP: %.2f | ATR: %.2f | Risk: $%.2f",
-      dir, lots, price, sl, tp, atr, InpRiskUSD));
+        "[TRADE] %s | Lots: %.2f | Entry: %.2f | SL: %.2f | TP: %.2f | ATR: %.2f | Risk: $%.2f",
+        dir, lots, price, sl, tp, atr, riskUSD));
+  }
+
+//+------------------------------------------------------------------+
+//| Log trade send failures                                           |
+//+------------------------------------------------------------------+
+void PrintTradeError(string dir)
+  {
+   Print(dir, " failed: ", Trade.ResultRetcode(), " - ", Trade.ResultRetcodeDescription());
   }
 //+------------------------------------------------------------------+
