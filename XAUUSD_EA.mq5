@@ -36,7 +36,7 @@ input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
 input int      InpMaxSpreadPts  = 35;       // Max allowed spread (points)
-input bool     InpTradeSession  = true;     // Filter by best XAUUSD session
+input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
 input int      InpSessionStart  = 12;       // Session start hour (UTC)
 input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
@@ -159,23 +159,23 @@ void OnTick()
       if(lots <= 0) return;
       if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
       if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
-          PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
+         PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
       else
-          PrintTradeError("BUY");
+         PrintTradeError("BUY");
       }
-    else if(signal == -1) // SELL
-      {
-       double sl     = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
-       double tp     = NormalizeDouble(bid - InpTPMultiplier * atr, _Digits);
-       double slPoints = (sl - bid) / point;
-       double lots     = CalculateLotSize(slPoints);
-       if(lots <= 0) return;
-       if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
-       if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
-           PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
-       else
-           PrintTradeError("SELL");
-       }
+   else if(signal == -1) // SELL
+     {
+      double sl       = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
+      double tp       = NormalizeDouble(bid - InpTPMultiplier * atr, _Digits);
+      double slPoints = (sl - bid) / point;
+      double lots     = CalculateLotSize(slPoints);
+      if(lots <= 0) return;
+      if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
+      if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
+         PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
+      else
+         PrintTradeError("SELL");
+     }
   }
 
 //+------------------------------------------------------------------+
