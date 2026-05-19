@@ -145,10 +145,10 @@ void OnTick()
    double atr = atrBuf[1];
    if(atr <= 0) return;
 
-    double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-    double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-    if(point <= 0) return;
+   double ask   = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double bid   = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   if(point <= 0) return;
 
    if(signal == 1) // BUY
      {
@@ -157,10 +157,10 @@ void OnTick()
       double slPoints = (ask - sl) / point;
       double lots     = CalculateLotSize(slPoints);
       if(lots <= 0) return;
-       if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
-       if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
+      if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
+      if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
           PrintTradeInfo("BUY", lots, ask, sl, tp, atr);
-       else
+      else
           PrintTradeError("BUY");
       }
     else if(signal == -1) // SELL
@@ -170,10 +170,10 @@ void OnTick()
        double slPoints = (sl - bid) / point;
        double lots     = CalculateLotSize(slPoints);
        if(lots <= 0) return;
-        if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
-        if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
+       if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
+       if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
            PrintTradeInfo("SELL", lots, bid, sl, tp, atr);
-        else
+       else
            PrintTradeError("SELL");
        }
   }
