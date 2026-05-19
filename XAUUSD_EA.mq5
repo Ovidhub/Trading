@@ -31,7 +31,7 @@ input double   InpTPMultiplier  = 3.0;      // TP = ATR × multiplier (RR ≈ 1:
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 50;       // Max allowed spread (points)
+input int      InpMaxSpreadPts  = 100;      // Max allowed spread (points)
 input bool     InpTradeSession  = true;     // Filter by London/NY session
 input int      InpSessionStart  = 7;        // Session start hour (UTC)
 input int      InpSessionEnd    = 20;       // Session end hour (UTC)
@@ -63,7 +63,7 @@ int OnInit()
   {
    Trade.SetExpertMagicNumber(InpMagicNumber);
    Trade.SetDeviationInPoints(30);
-   Trade.SetTypeFilling(ORDER_FILLING_FOK);
+   Trade.SetTypeFilling(ORDER_FILLING_IOC);
 
    handleFastEMA  = iMA(_Symbol, InpTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
    handleSlowEMA  = iMA(_Symbol, InpTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
@@ -112,23 +112,44 @@ void OnTick()
    long spreadPoints = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
    if(spreadPoints > InpMaxSpreadPts)
      {
-      Print("Spread too wide: ", spreadPoints, " pts — skipping.");
+      Print("BLOCKED spread=", spreadPoints, " pts (max ", InpMaxSpreadPts, ")");
       return;
      }
 
    // Session filter
    if(InpTradeSession && !IsInSession())
+     {
+      MqlDateTime dt; TimeToStruct(TimeGMT(), dt);
+      Print("BLOCKED session: UTC hour=", dt.hour, " (allowed ", InpSessionStart, "-", InpSessionEnd, ")");
       return;
+     }
 
    // Refresh indicator data
-   if(!RefreshBuffers()) return;
+   if(!RefreshBuffers())
+     {
+      Print("BLOCKED RefreshBuffers failed — not enough history yet.");
+      return;
+     }
 
    // Skip if already holding a position on this symbol/magic
-   if(HasOpenPosition()) return;
+   if(HasOpenPosition())
+     {
+      Print("BLOCKED already in position.");
+      return;
+     }
 
    // Evaluate signal
    int signal = GetSignal();
-   if(signal == 0) return;
+   if(signal == 0)
+     {
+      Print("NO SIGNAL: fast[1]=", DoubleToString(fastEMABuf[1],2),
+            " slow[1]=", DoubleToString(slowEMABuf[1],2),
+            " fast[2]=", DoubleToString(fastEMABuf[2],2),
+            " slow[2]=", DoubleToString(slowEMABuf[2],2),
+            " trend=", DoubleToString(trendEMABuf[1],2),
+            " close=", DoubleToString(iClose(_Symbol,InpTimeframe,1),2));
+      return;
+     }
 
    double atr = atrBuf[1];
    if(atr <= 0) return;
