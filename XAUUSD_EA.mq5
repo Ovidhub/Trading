@@ -83,7 +83,7 @@ int OnInit()
 
    if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
      {
-      Print("ERROR: Set InpRiskUSD or InpRiskPercent above zero.");
+      Print("ERROR: At least one of InpRiskUSD or InpRiskPercent must be greater than zero.");
       return INIT_PARAMETERS_INCORRECT;
      }
 
@@ -154,8 +154,8 @@ void OnTick()
      {
       double sl     = NormalizeDouble(ask - InpSLMultiplier * atr, _Digits);
       double tp     = NormalizeDouble(ask + InpTPMultiplier * atr, _Digits);
-      double slPoints = (ask - sl) / point;
-      double lots     = CalculateLotSize(slPoints);
+      double slInPoints = (ask - sl) / point;
+      double lots       = CalculateLotSize(slInPoints);
       if(lots <= 0) return;
       if(!CanAffordTrade(ORDER_TYPE_BUY, lots, ask)) return;
       if(Trade.Buy(lots, _Symbol, ask, sl, tp, "XAUUSD EA BUY"))
@@ -167,8 +167,8 @@ void OnTick()
      {
       double sl       = NormalizeDouble(bid + InpSLMultiplier * atr, _Digits);
       double tp       = NormalizeDouble(bid - InpTPMultiplier * atr, _Digits);
-      double slPoints = (sl - bid) / point;
-      double lots     = CalculateLotSize(slPoints);
+      double slInPoints = (sl - bid) / point;
+      double lots       = CalculateLotSize(slInPoints);
       if(lots <= 0) return;
       if(!CanAffordTrade(ORDER_TYPE_SELL, lots, bid)) return;
       if(Trade.Sell(lots, _Symbol, bid, sl, tp, "XAUUSD EA SELL"))
@@ -214,12 +214,20 @@ int GetSignal()
   }
 
 //+------------------------------------------------------------------+
+//| Helper: calculate percentage amount                              |
+//+------------------------------------------------------------------+
+double PercentOf(double value, double percent)
+  {
+   return value * (percent / 100.0);
+  }
+
+//+------------------------------------------------------------------+
 //| Auto lot size based on adaptive risk and SL distance             |
 //+------------------------------------------------------------------+
 double GetRiskAmountUSD()
   {
    double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
-   double riskPct = equity * (InpRiskPercent / 100.0);
+   double riskPct = PercentOf(equity, InpRiskPercent);
    double riskUSD = 0.0;
 
    if(InpRiskPercent > 0)
@@ -248,6 +256,8 @@ double EstimateRiskUSD(double lots, double slInPoints)
    if(tickValue <= 0 || tickSize <= 0 || point <= 0)
       return 0;
 
+   // Repeat the same point-value calculation used in lot sizing so the
+   // logged/validated USD risk matches the sizing formula.
    double valuePerPointPerLot = tickValue * (point / tickSize);
    return lots * slInPoints * valuePerPointPerLot;
   }
@@ -292,7 +302,7 @@ double CalculateLotSize(double slInPoints)
 
       double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       double minLotRiskUSD = EstimateRiskUSD(minLot, slInPoints);
-      double allowedMinLotRiskUSD = equity * (InpMaxMinLotRiskPct / 100.0);
+      double allowedMinLotRiskUSD = PercentOf(equity, InpMaxMinLotRiskPct);
 
       if(minLotRiskUSD > allowedMinLotRiskUSD)
         {
