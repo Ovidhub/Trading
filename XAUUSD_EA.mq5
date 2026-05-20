@@ -89,6 +89,8 @@ double         htfFastEMABuf[];
 double         htfSlowEMABuf[];
 double         htfTrendEMABuf[];
 
+const int      MIN_INDICATOR_BUFFER_BARS = 3;
+
 //+------------------------------------------------------------------+
 //| Resolve the configured signal timeframe                          |
 //+------------------------------------------------------------------+
@@ -110,29 +112,29 @@ ENUM_TIMEFRAMES GetHigherTimeframe()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-    Trade.SetExpertMagicNumber(InpMagicNumber);
+   Trade.SetExpertMagicNumber(InpMagicNumber);
    Trade.SetDeviationInPoints(30);
    Trade.SetTypeFilling(ORDER_FILLING_IOC);
 
-    ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
-    ENUM_TIMEFRAMES higherTimeframe = GetHigherTimeframe();
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   ENUM_TIMEFRAMES higherTimeframe = GetHigherTimeframe();
 
-    handleFastEMA  = iMA(_Symbol, signalTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
-    handleSlowEMA  = iMA(_Symbol, signalTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
-    handleTrendEMA = iMA(_Symbol, signalTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
-    handleATR      = iATR(_Symbol, signalTimeframe, InpATRPeriod);
-    handleHTFFastEMA  = iMA(_Symbol, higherTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
-    handleHTFSlowEMA  = iMA(_Symbol, higherTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
-    handleHTFTrendEMA = iMA(_Symbol, higherTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+   handleFastEMA  = iMA(_Symbol, signalTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleSlowEMA  = iMA(_Symbol, signalTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleTrendEMA = iMA(_Symbol, signalTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+   handleATR      = iATR(_Symbol, signalTimeframe, InpATRPeriod);
+   handleHTFFastEMA  = iMA(_Symbol, higherTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleHTFSlowEMA  = iMA(_Symbol, higherTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleHTFTrendEMA = iMA(_Symbol, higherTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
 
-    if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
-        handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE ||
-        handleHTFFastEMA == INVALID_HANDLE || handleHTFSlowEMA == INVALID_HANDLE ||
-        handleHTFTrendEMA == INVALID_HANDLE)
-       {
-        Print("ERROR: Failed to create indicator handles.");
-        return INIT_FAILED;
-       }
+   if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
+      handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE ||
+      handleHTFFastEMA == INVALID_HANDLE || handleHTFSlowEMA == INVALID_HANDLE ||
+      handleHTFTrendEMA == INVALID_HANDLE)
+     {
+      Print("ERROR: Failed to create indicator handles.");
+      return INIT_FAILED;
+     }
 
    if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
       {
@@ -152,54 +154,54 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
       }
 
-    if(InpMinBodyATR <= 0)
-       {
-       Print("ERROR: InpMinBodyATR must be greater than zero.");
-       return INIT_PARAMETERS_INCORRECT;
-       }
+   if(InpMinBodyATR <= 0)
+      {
+      Print("ERROR: InpMinBodyATR must be greater than zero.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
-    if(InpSwingStrength < 1)
-       {
-        Print("ERROR: InpSwingStrength must be at least 1.");
-        return INIT_PARAMETERS_INCORRECT;
-       }
+   if(InpSwingStrength < 1)
+      {
+      Print("ERROR: InpSwingStrength must be at least 1.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
-    if(InpHTFStructureLookback < (InpSwingStrength + 2) ||
-       InpHTFSRLookback < (InpSwingStrength + 2) ||
-       InpStructureLookback < (InpSwingStrength + 2) ||
-       InpLiquiditySweepLookback < (InpSwingStrength + 2))
-       {
-        Print("ERROR: Structure and liquidity lookbacks must be larger than the swing strength.");
-        return INIT_PARAMETERS_INCORRECT;
-       }
+   if(InpHTFStructureLookback < (InpSwingStrength + 2) ||
+      InpHTFSRLookback < (InpSwingStrength + 2) ||
+      InpStructureLookback < (InpSwingStrength + 2) ||
+      InpLiquiditySweepLookback < (InpSwingStrength + 2))
+      {
+      Print("ERROR: Structure and liquidity lookbacks must be larger than the swing strength.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
-    if(InpHTFMinDistanceATR < 0 || InpLiquiditySweepRejectATR < 0)
-       {
-        Print("ERROR: ATR-based distance filters cannot be negative.");
-        return INIT_PARAMETERS_INCORRECT;
-       }
+   if(InpHTFMinDistanceATR < 0 || InpLiquiditySweepRejectATR < 0)
+      {
+      Print("ERROR: ATR-based distance filters cannot be negative.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
-    if((InpUseHTFBias || InpUseHTFSRFilter) && PeriodSeconds(higherTimeframe) <= PeriodSeconds(signalTimeframe))
-       {
-        Print("ERROR: InpHTFTimeframe must be higher than the signal timeframe when HTF filters are enabled.");
-        return INIT_PARAMETERS_INCORRECT;
-       }
+   if((InpUseHTFBias || InpUseHTFSRFilter) && PeriodSeconds(higherTimeframe) <= PeriodSeconds(signalTimeframe))
+      {
+      Print("ERROR: InpHTFTimeframe must be higher than the signal timeframe when HTF filters are enabled.");
+      return INIT_PARAMETERS_INCORRECT;
+      }
 
-    ArraySetAsSeries(fastEMABuf,  true);
-    ArraySetAsSeries(slowEMABuf,  true);
-    ArraySetAsSeries(trendEMABuf, true);
-    ArraySetAsSeries(atrBuf,      true);
-    ArraySetAsSeries(htfFastEMABuf,  true);
-    ArraySetAsSeries(htfSlowEMABuf,  true);
-    ArraySetAsSeries(htfTrendEMABuf, true);
+   ArraySetAsSeries(fastEMABuf,  true);
+   ArraySetAsSeries(slowEMABuf,  true);
+   ArraySetAsSeries(trendEMABuf, true);
+   ArraySetAsSeries(atrBuf,      true);
+   ArraySetAsSeries(htfFastEMABuf,  true);
+   ArraySetAsSeries(htfSlowEMABuf,  true);
+   ArraySetAsSeries(htfTrendEMABuf, true);
 
-    Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
-          " | Risk %: ", DoubleToString(InpRiskPercent, 2),
-          " | Signal TF: ", EnumToString(signalTimeframe),
-          " | HTF: ", EnumToString(higherTimeframe),
-          " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
-          " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
-    return INIT_SUCCEEDED;
+   Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
+         " | Risk %: ", DoubleToString(InpRiskPercent, 2),
+         " | Signal TF: ", EnumToString(signalTimeframe),
+         " | HTF: ", EnumToString(higherTimeframe),
+         " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
+         " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
+   return INIT_SUCCEEDED;
   }
 
 //+------------------------------------------------------------------+
@@ -319,9 +321,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-    ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
-    double closePrice = iClose(_Symbol, signalTimeframe, 1);
-    double openPrice  = iOpen(_Symbol, signalTimeframe, 1);
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   double closePrice = iClose(_Symbol, signalTimeframe, 1);
+   double openPrice  = iOpen(_Symbol, signalTimeframe, 1);
    double bodySize   = MathAbs(closePrice - openPrice);
    double atr        = atrBuf[1];
 
@@ -359,66 +361,20 @@ int GetSignal()
       recentLow  = MathMin(recentLow, iLow(_Symbol, signalTimeframe, i));
       }
 
-    bool strongMove   = (bodySize >= atr * InpMinBodyATR);
-    bool bullBreakout = (closePrice > recentHigh);
-    bool bearBreakout = (closePrice < recentLow);
+   bool strongMove   = (bodySize >= atr * InpMinBodyATR);
+   bool bullBreakout = (closePrice > recentHigh);
+   bool bearBreakout = (closePrice < recentLow);
 
-    bool bullSignal = (bullTrend && strongMove && (bullCross || bullBreakout));
-    bool bearSignal = (bearTrend && strongMove && (bearCross || bearBreakout));
+   bool bullSignal = (bullTrend && strongMove && (bullCross || bullBreakout));
+   bool bearSignal = (bearTrend && strongMove && (bearCross || bearBreakout));
 
-    if(bullSignal)
-      {
-       if(!PassHigherTimeframeBias(1))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: HTF bias is not bullish.");
-         }
-       else if(!PassHigherTimeframeDistanceFilter(1, closePrice, atr))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: buy signal too close to HTF resistance.");
-         }
-       else if(!PassMarketStructureFilter(1))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: bullish market structure confirmation missing.");
-         }
-       else if(!PassLiquiditySweepFilter(1, closePrice, atr))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: no bullish liquidity sweep rejection detected.");
-         }
-       else
-          return 1;
-      }
+   if(bullSignal && PassDirectionalFilters(1, closePrice, atr))
+      return 1;
 
-    if(bearSignal)
-      {
-       if(!PassHigherTimeframeBias(-1))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: HTF bias is not bearish.");
-         }
-       else if(!PassHigherTimeframeDistanceFilter(-1, closePrice, atr))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: sell signal too close to HTF support.");
-         }
-       else if(!PassMarketStructureFilter(-1))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: bearish market structure confirmation missing.");
-         }
-       else if(!PassLiquiditySweepFilter(-1, closePrice, atr))
-         {
-          if(InpDebugLog)
-             Print("BLOCKED: no bearish liquidity sweep rejection detected.");
-         }
-       else
-          return -1;
-      }
+   if(bearSignal && PassDirectionalFilters(-1, closePrice, atr))
+      return -1;
 
-    return 0;
+   return 0;
   }
 
 //+------------------------------------------------------------------+
@@ -614,6 +570,42 @@ bool PassHigherTimeframeDistanceFilter(int direction, double closePrice, double 
   }
 
 //+------------------------------------------------------------------+
+//| Run the directional filter chain                                   |
+//+------------------------------------------------------------------+
+bool PassDirectionalFilters(int direction, double closePrice, double atr)
+  {
+   if(!PassHigherTimeframeBias(direction))
+     {
+      if(InpDebugLog)
+         Print(direction > 0 ? "BLOCKED: HTF bias is not bullish." : "BLOCKED: HTF bias is not bearish.");
+      return false;
+     }
+
+   if(!PassHigherTimeframeDistanceFilter(direction, closePrice, atr))
+     {
+      if(InpDebugLog)
+         Print(direction > 0 ? "BLOCKED: buy signal too close to HTF resistance." : "BLOCKED: sell signal too close to HTF support.");
+      return false;
+     }
+
+   if(!PassMarketStructureFilter(direction))
+     {
+      if(InpDebugLog)
+         Print(direction > 0 ? "BLOCKED: bullish market structure confirmation missing." : "BLOCKED: bearish market structure confirmation missing.");
+      return false;
+     }
+
+   if(!PassLiquiditySweepFilter(direction, closePrice, atr))
+     {
+      if(InpDebugLog)
+         Print(direction > 0 ? "BLOCKED: no bullish liquidity sweep rejection detected." : "BLOCKED: no bearish liquidity sweep rejection detected.");
+      return false;
+     }
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
 //| Check signal-timeframe market structure                            |
 //+------------------------------------------------------------------+
 bool PassMarketStructureFilter(int direction)
@@ -784,15 +776,15 @@ bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
 bool RefreshBuffers()
   {
    int bars = MathMax(InpSignalBars + 3, InpBreakoutLookback + 4);
-   bars = MathMax(bars, 3);
-    if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
-    if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
-    if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
-    if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
-    if(CopyBuffer(handleHTFFastEMA,  0, 0, 3, htfFastEMABuf)  < 3) return false;
-    if(CopyBuffer(handleHTFSlowEMA,  0, 0, 3, htfSlowEMABuf)  < 3) return false;
-    if(CopyBuffer(handleHTFTrendEMA, 0, 0, 3, htfTrendEMABuf) < 3) return false;
-    return true;
+   bars = MathMax(bars, MIN_INDICATOR_BUFFER_BARS);
+   if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
+   if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
+   if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
+   if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
+   if(CopyBuffer(handleHTFFastEMA,  0, 0, MIN_INDICATOR_BUFFER_BARS, htfFastEMABuf)  < MIN_INDICATOR_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFSlowEMA,  0, 0, MIN_INDICATOR_BUFFER_BARS, htfSlowEMABuf)  < MIN_INDICATOR_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFTrendEMA, 0, 0, MIN_INDICATOR_BUFFER_BARS, htfTrendEMABuf) < MIN_INDICATOR_BUFFER_BARS) return false;
+   return true;
   }
 
 //+------------------------------------------------------------------+
