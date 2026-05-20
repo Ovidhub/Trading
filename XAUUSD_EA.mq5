@@ -173,7 +173,7 @@ int OnInit()
       InpStructureLookback < (InpSwingStrength + 2) ||
       InpLiquiditySweepLookback < (InpSwingStrength + 2))
       {
-      Print("ERROR: Structure and liquidity lookbacks must be larger than the swing strength.");
+      Print("ERROR: Structure and liquidity lookbacks must be at least InpSwingStrength + 2.");
       return INIT_PARAMETERS_INCORRECT;
       }
 
@@ -448,7 +448,7 @@ bool FindRecentSwing(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength, 
    int maxSearchShift = lookbackBars + strength;
    // The oldest pivot we inspect can still read `strength` bars to the right,
    // so the history requirement extends to maxSearchShift + strength.
-   if(barsAvailable <= maxSearchShift + strength)
+   if(barsAvailable < maxSearchShift + strength + 1)
       return false;
 
    for(int shift = strength + 1; shift <= maxSearchShift; shift++)
@@ -477,7 +477,7 @@ bool FindRecentSwingPair(ENUM_TIMEFRAMES timeframe, int lookbackBars, int streng
 
    // The oldest pivot we inspect can still read `strength` bars to the right,
    // so the history requirement extends to maxSearchShift + strength.
-   if(barsAvailable <= maxSearchShift + strength)
+   if(barsAvailable < maxSearchShift + strength + 1)
       return false;
 
    for(int shift = strength + 1; shift <= maxSearchShift; shift++)
