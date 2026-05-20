@@ -237,7 +237,7 @@ int GetSignal()
 
    if(bullCross)
      {
-      for(int i = confirmationWindowStart - 1; i >= 1 && bullCross; i--)
+      for(int i = confirmationWindowStart - 1; i >= 1; i--)
         {
          if(fastEMABuf[i] <= slowEMABuf[i])
            {
@@ -249,7 +249,7 @@ int GetSignal()
 
    if(bearCross)
      {
-      for(int i = confirmationWindowStart - 1; i >= 1 && bearCross; i--)
+      for(int i = confirmationWindowStart - 1; i >= 1; i--)
         {
          if(fastEMABuf[i] >= slowEMABuf[i])
            {
