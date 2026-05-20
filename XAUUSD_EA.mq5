@@ -404,7 +404,7 @@ bool IsSwingHigh(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iHigh(_Symbol, timeframe, shift);
-   if(candidate < 0 || candidate == 0)
+   if(candidate == 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -426,7 +426,7 @@ bool IsSwingLow(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iLow(_Symbol, timeframe, shift);
-   if(candidate < 0 || candidate == 0)
+   if(candidate == 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -445,13 +445,13 @@ bool IsSwingLow(ENUM_TIMEFRAMES timeframe, int shift, int strength)
 bool FindRecentSwing(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength, bool findHigh, double &price, int &shiftFound)
   {
    int barsAvailable = iBars(_Symbol, timeframe);
-   int maxShift = lookbackBars + strength;
-   // maxShift already includes one side of the swing; the extra strength keeps
-   // shift + offset reads in-bounds for the oldest eligible pivot.
-   if(barsAvailable <= maxShift + strength)
+   int maxSearchShift = lookbackBars + strength;
+   // The oldest pivot we inspect can still read `strength` bars to the right,
+   // so the history requirement extends to maxSearchShift + strength.
+   if(barsAvailable <= maxSearchShift + strength)
       return false;
 
-   for(int shift = strength + 1; shift <= maxShift; shift++)
+   for(int shift = strength + 1; shift <= maxSearchShift; shift++)
       {
        bool isMatch = findHigh ? IsSwingHigh(timeframe, shift, strength) : IsSwingLow(timeframe, shift, strength);
        if(isMatch)
@@ -472,15 +472,15 @@ bool FindRecentSwingPair(ENUM_TIMEFRAMES timeframe, int lookbackBars, int streng
                          double &latestPrice, double &previousPrice)
   {
    int barsAvailable = iBars(_Symbol, timeframe);
-   int maxShift = lookbackBars + strength;
+   int maxSearchShift = lookbackBars + strength;
    int found = 0;
 
-   // maxShift already includes one side of the swing; the extra strength keeps
-   // shift + offset reads in-bounds for the oldest eligible pivot.
-   if(barsAvailable <= maxShift + strength)
+   // The oldest pivot we inspect can still read `strength` bars to the right,
+   // so the history requirement extends to maxSearchShift + strength.
+   if(barsAvailable <= maxSearchShift + strength)
       return false;
 
-   for(int shift = strength + 1; shift <= maxShift; shift++)
+   for(int shift = strength + 1; shift <= maxSearchShift; shift++)
       {
        bool isMatch = findHigh ? IsSwingHigh(timeframe, shift, strength) : IsSwingLow(timeframe, shift, strength);
        if(!isMatch)
