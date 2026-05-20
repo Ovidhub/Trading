@@ -266,20 +266,26 @@ int GetSignal()
    bool bullCross = false;
    bool bearCross = false;
    for(int i = 1; i <= InpSignalBars; i++)
-     {
+      {
       if(fastEMABuf[i + 1] <= slowEMABuf[i + 1] && fastEMABuf[i] > slowEMABuf[i])
+        {
          bullCross = true;
+         break;
+        }
       if(fastEMABuf[i + 1] >= slowEMABuf[i + 1] && fastEMABuf[i] < slowEMABuf[i])
+        {
          bearCross = true;
-     }
+         break;
+        }
+      }
 
    double recentHigh = iHigh(_Symbol, signalTimeframe, 2);
    double recentLow  = iLow(_Symbol, signalTimeframe, 2);
-   for(int i = 3; i < InpBreakoutLookback + 2; i++)
-     {
+   for(int i = 2; i < InpBreakoutLookback + 2; i++)
+      {
       recentHigh = MathMax(recentHigh, iHigh(_Symbol, signalTimeframe, i));
       recentLow  = MathMin(recentLow, iLow(_Symbol, signalTimeframe, i));
-     }
+      }
 
    bool strongMove   = (bodySize >= atr * InpMinBodyATR);
    bool bullBreakout = (closePrice > recentHigh);
