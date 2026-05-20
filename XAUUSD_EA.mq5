@@ -20,7 +20,7 @@ input double   InpRiskPercent   = 0.0;      // Optional % risk, only used when U
 input double   InpMaxLotSize    = 5.0;      // Maximum lot size cap
 input double   InpMinLotSize    = 0.01;     // Minimum lot size
 input bool     InpAllowMinLotFallback = true; // Allow broker min lot when risk stays reasonable
-input double   InpMaxMinLotRiskUSD = 3.0;  // Max USD risk allowed for min-lot fallback
+input double   InpMinLotFallbackRiskUSD = 3.0; // Max USD risk allowed for min-lot fallback
 input double   InpMinFreeMarginUSD = 0.0;  // Keep this free margin after entry
 
 input group "=== EMA Settings ==="
@@ -356,7 +356,7 @@ double CalculateLotSize(double slInPoints)
         }
 
       double minLotRiskUSD = EstimateRiskUSD(minLot, slInPoints);
-      double allowedMinLotRiskUSD = (InpMaxMinLotRiskUSD > 0) ? InpMaxMinLotRiskUSD : riskUSD;
+      double allowedMinLotRiskUSD = (InpMinLotFallbackRiskUSD > 0) ? InpMinLotFallbackRiskUSD : riskUSD;
 
       if(minLotRiskUSD > allowedMinLotRiskUSD)
         {

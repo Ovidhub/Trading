@@ -42,7 +42,7 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, with
 | `InpMaxLotSize` | `5.0` | Hard cap on lot size |
 | `InpMinLotSize` | `0.01` | Minimum lot size |
 | `InpAllowMinLotFallback` | `true` | Allow broker minimum lot if the risk remains reasonable |
-| `InpMaxMinLotRiskUSD` | `3.0` | Maximum USD risk allowed when falling back to the minimum lot |
+| `InpMinLotFallbackRiskUSD` | `3.0` | Maximum USD risk allowed when falling back to the minimum lot |
 | `InpMinFreeMarginUSD` | `0.0` | Free margin buffer to keep after entry |
 | `InpFastEMA` | `21` | Fast EMA period |
 | `InpSlowEMA` | `50` | Slow EMA period |
