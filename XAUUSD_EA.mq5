@@ -370,7 +370,7 @@ double CalculateLotSize(double slInPoints)
 //+------------------------------------------------------------------+
 bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
   {
-   double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
 
    if(freeMargin <= InpMinFreeMarginUSD)
      {
