@@ -35,7 +35,7 @@ input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points)
+input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points) to tolerate typical Deriv gold spreads
 input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
 input int      InpSessionStart  = 12;       // Session start hour (UTC)
 input int      InpSessionEnd    = 17;       // Session end hour (UTC)
@@ -64,6 +64,14 @@ double         trendEMABuf[];
 double         atrBuf[];
 
 //+------------------------------------------------------------------+
+//| Resolve the configured signal timeframe                          |
+//+------------------------------------------------------------------+
+ENUM_TIMEFRAMES GetSignalTimeframe()
+  {
+   return (InpTimeframe == PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : InpTimeframe;
+  }
+
+//+------------------------------------------------------------------+
 //| Expert initialisation                                             |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -72,10 +80,12 @@ int OnInit()
    Trade.SetDeviationInPoints(30);
    Trade.SetTypeFilling(ORDER_FILLING_IOC);
 
-   handleFastEMA  = iMA(_Symbol, InpTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
-   handleSlowEMA  = iMA(_Symbol, InpTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
-   handleTrendEMA = iMA(_Symbol, InpTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
-   handleATR      = iATR(_Symbol, InpTimeframe, InpATRPeriod);
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+
+   handleFastEMA  = iMA(_Symbol, signalTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleSlowEMA  = iMA(_Symbol, signalTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
+   handleTrendEMA = iMA(_Symbol, signalTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+   handleATR      = iATR(_Symbol, signalTimeframe, InpATRPeriod);
 
    if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
        handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
@@ -101,11 +111,9 @@ int OnInit()
    ArraySetAsSeries(trendEMABuf, true);
    ArraySetAsSeries(atrBuf,      true);
 
-   ENUM_TIMEFRAMES activeTimeframe = (InpTimeframe == PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : InpTimeframe;
-
    Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
          " | Risk %: ", DoubleToString(InpRiskPercent, 2),
-         " | Signal TF: ", EnumToString(activeTimeframe),
+         " | Signal TF: ", EnumToString(signalTimeframe),
          " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
          " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
    return INIT_SUCCEEDED;
@@ -129,7 +137,8 @@ void OnTick()
   {
    // Only act on new bar
    static datetime lastBarTime = 0;
-   datetime currentBarTime = iTime(_Symbol, InpTimeframe, 0);
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   datetime currentBarTime = iTime(_Symbol, signalTimeframe, 0);
    if(currentBarTime == lastBarTime) return;
    lastBarTime = currentBarTime;
 
@@ -176,9 +185,9 @@ void OnTick()
      {
       if(InpDebugLog)
          // Signal requires an EMA crossover aligned with the trend EMA filter.
-         PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
-                     fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
-                     trendEMABuf[1], iClose(_Symbol, InpTimeframe, 1));
+          PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
+                      fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
+                      trendEMABuf[1], iClose(_Symbol, signalTimeframe, 1));
       return;
      }
 
@@ -228,7 +237,7 @@ int GetSignal()
    double trendNow = trendEMABuf[1];
 
    // Trend filter: price (close) must be above/below 200 EMA
-   double closePrice = iClose(_Symbol, InpTimeframe, 1);
+    double closePrice = iClose(_Symbol, GetSignalTimeframe(), 1);
 
    bool bullTrend = (closePrice > trendNow);
    bool bearTrend = (closePrice < trendNow);

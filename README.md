@@ -51,7 +51,7 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 | `InpSLMultiplier` | `1.2` | SL distance = ATR × multiplier |
 | `InpTPMultiplier` | `2.4` | TP distance = ATR × multiplier |
 | `InpMagicNumber` | `202600` | Unique EA identifier |
-| `InpMaxSpreadPts` | `80` | Skip trade if spread exceeds this |
+| `InpMaxSpreadPts` | `80` | Skip trade if spread exceeds this (wider default to tolerate typical Deriv XAUUSD spreads) |
 | `InpTradeSession` | `true` | Enable session filter |
 | `InpSessionStart` | `12` | Session start (UTC hour) |
 | `InpSessionEnd` | `17` | Session end (UTC hour) |
