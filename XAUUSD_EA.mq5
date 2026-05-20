@@ -7,7 +7,7 @@
 //|  Symbol    : XAUUSD                                               |
 //+------------------------------------------------------------------+
 #property copyright "Ovidhub/Trading"
-#property version   "1.13"
+#property version   "1.14"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -46,6 +46,24 @@ input int      InpSignalBars    = 3;        // Bars to scan for a fresh EMA cros
 input int      InpBreakoutLookback = 3;     // Bars used to detect breakout opportunity
 input double   InpMinBodyATR    = 0.20;     // Minimum signal candle body as ATR fraction
 
+input group "=== Higher Timeframe Filters ==="
+input bool     InpUseHTFBias    = true;     // Require higher-timeframe trend + structure alignment
+input ENUM_TIMEFRAMES InpHTFTimeframe = PERIOD_H1; // Higher timeframe for directional bias
+input int      InpHTFStructureLookback = 30; // Bars used to read higher-timeframe structure
+input bool     InpUseHTFSRFilter = true;    // Block entries too close to higher-timeframe S/R
+input int      InpHTFSRLookback = 30;       // Bars used to find higher-timeframe swing S/R
+input double   InpHTFMinDistanceATR = 0.50; // Minimum distance to HTF S/R as ATR multiple
+
+input group "=== Market Structure Filters ==="
+input bool     InpUseMarketStructure = true; // Require signal-timeframe structure alignment
+input int      InpStructureLookback = 20;   // Bars used to evaluate recent structure
+input int      InpSwingStrength = 2;        // Pivot strength for swing detection
+
+input group "=== Liquidity Sweep Filter ==="
+input bool     InpUseLiquiditySweep = false; // Require a sweep + rejection of recent liquidity
+input int      InpLiquiditySweepLookback = 12; // Bars used to find recent swing liquidity
+input double   InpLiquiditySweepRejectATR = 0.10; // Rejection reclaim distance as ATR multiple
+
 input group "=== Debug ==="
 input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
 
@@ -58,12 +76,18 @@ int            handleFastEMA;
 int            handleSlowEMA;
 int            handleTrendEMA;
 int            handleATR;
+int            handleHTFFastEMA;
+int            handleHTFSlowEMA;
+int            handleHTFTrendEMA;
 
 //--- Cached buffers
 double         fastEMABuf[];
 double         slowEMABuf[];
 double         trendEMABuf[];
 double         atrBuf[];
+double         htfFastEMABuf[];
+double         htfSlowEMABuf[];
+double         htfTrendEMABuf[];
 
 //+------------------------------------------------------------------+
 //| Resolve the configured signal timeframe                          |
@@ -74,27 +98,41 @@ ENUM_TIMEFRAMES GetSignalTimeframe()
   }
 
 //+------------------------------------------------------------------+
+//| Resolve the configured higher timeframe                           |
+//+------------------------------------------------------------------+
+ENUM_TIMEFRAMES GetHigherTimeframe()
+  {
+   return (InpHTFTimeframe == PERIOD_CURRENT) ? GetSignalTimeframe() : InpHTFTimeframe;
+  }
+
+//+------------------------------------------------------------------+
 //| Expert initialisation                                             |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   Trade.SetExpertMagicNumber(InpMagicNumber);
+    Trade.SetExpertMagicNumber(InpMagicNumber);
    Trade.SetDeviationInPoints(30);
    Trade.SetTypeFilling(ORDER_FILLING_IOC);
 
-   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+    ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+    ENUM_TIMEFRAMES higherTimeframe = GetHigherTimeframe();
 
-   handleFastEMA  = iMA(_Symbol, signalTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
-   handleSlowEMA  = iMA(_Symbol, signalTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
-   handleTrendEMA = iMA(_Symbol, signalTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
-   handleATR      = iATR(_Symbol, signalTimeframe, InpATRPeriod);
+    handleFastEMA  = iMA(_Symbol, signalTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
+    handleSlowEMA  = iMA(_Symbol, signalTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
+    handleTrendEMA = iMA(_Symbol, signalTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
+    handleATR      = iATR(_Symbol, signalTimeframe, InpATRPeriod);
+    handleHTFFastEMA  = iMA(_Symbol, higherTimeframe, InpFastEMA,  0, MODE_EMA, PRICE_CLOSE);
+    handleHTFSlowEMA  = iMA(_Symbol, higherTimeframe, InpSlowEMA,  0, MODE_EMA, PRICE_CLOSE);
+    handleHTFTrendEMA = iMA(_Symbol, higherTimeframe, InpTrendEMA, 0, MODE_EMA, PRICE_CLOSE);
 
-   if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
-       handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE)
-      {
-       Print("ERROR: Failed to create indicator handles.");
-       return INIT_FAILED;
-      }
+    if(handleFastEMA == INVALID_HANDLE || handleSlowEMA == INVALID_HANDLE ||
+        handleTrendEMA == INVALID_HANDLE || handleATR == INVALID_HANDLE ||
+        handleHTFFastEMA == INVALID_HANDLE || handleHTFSlowEMA == INVALID_HANDLE ||
+        handleHTFTrendEMA == INVALID_HANDLE)
+       {
+        Print("ERROR: Failed to create indicator handles.");
+        return INIT_FAILED;
+       }
 
    if(InpRiskUSD <= 0 && InpRiskPercent <= 0)
       {
@@ -114,23 +152,54 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
       }
 
-   if(InpMinBodyATR <= 0)
-      {
-      Print("ERROR: InpMinBodyATR must be greater than zero.");
-      return INIT_PARAMETERS_INCORRECT;
-      }
+    if(InpMinBodyATR <= 0)
+       {
+       Print("ERROR: InpMinBodyATR must be greater than zero.");
+       return INIT_PARAMETERS_INCORRECT;
+       }
 
-   ArraySetAsSeries(fastEMABuf,  true);
-   ArraySetAsSeries(slowEMABuf,  true);
-   ArraySetAsSeries(trendEMABuf, true);
-   ArraySetAsSeries(atrBuf,      true);
+    if(InpSwingStrength < 1)
+       {
+        Print("ERROR: InpSwingStrength must be at least 1.");
+        return INIT_PARAMETERS_INCORRECT;
+       }
 
-   Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
-         " | Risk %: ", DoubleToString(InpRiskPercent, 2),
-         " | Signal TF: ", EnumToString(signalTimeframe),
-         " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
-         " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
-   return INIT_SUCCEEDED;
+    if(InpHTFStructureLookback < (InpSwingStrength + 2) ||
+       InpHTFSRLookback < (InpSwingStrength + 2) ||
+       InpStructureLookback < (InpSwingStrength + 2) ||
+       InpLiquiditySweepLookback < (InpSwingStrength + 2))
+       {
+        Print("ERROR: Structure and liquidity lookbacks must be larger than the swing strength.");
+        return INIT_PARAMETERS_INCORRECT;
+       }
+
+    if(InpHTFMinDistanceATR < 0 || InpLiquiditySweepRejectATR < 0)
+       {
+        Print("ERROR: ATR-based distance filters cannot be negative.");
+        return INIT_PARAMETERS_INCORRECT;
+       }
+
+    if((InpUseHTFBias || InpUseHTFSRFilter) && PeriodSeconds(higherTimeframe) <= PeriodSeconds(signalTimeframe))
+       {
+        Print("ERROR: InpHTFTimeframe must be higher than the signal timeframe when HTF filters are enabled.");
+        return INIT_PARAMETERS_INCORRECT;
+       }
+
+    ArraySetAsSeries(fastEMABuf,  true);
+    ArraySetAsSeries(slowEMABuf,  true);
+    ArraySetAsSeries(trendEMABuf, true);
+    ArraySetAsSeries(atrBuf,      true);
+    ArraySetAsSeries(htfFastEMABuf,  true);
+    ArraySetAsSeries(htfSlowEMABuf,  true);
+    ArraySetAsSeries(htfTrendEMABuf, true);
+
+    Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
+          " | Risk %: ", DoubleToString(InpRiskPercent, 2),
+          " | Signal TF: ", EnumToString(signalTimeframe),
+          " | HTF: ", EnumToString(higherTimeframe),
+          " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
+          " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
+    return INIT_SUCCEEDED;
   }
 
 //+------------------------------------------------------------------+
@@ -142,6 +211,9 @@ void OnDeinit(const int reason)
    IndicatorRelease(handleSlowEMA);
    IndicatorRelease(handleTrendEMA);
    IndicatorRelease(handleATR);
+   IndicatorRelease(handleHTFFastEMA);
+   IndicatorRelease(handleHTFSlowEMA);
+   IndicatorRelease(handleHTFTrendEMA);
   }
 
 //+------------------------------------------------------------------+
@@ -247,9 +319,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
-   double closePrice = iClose(_Symbol, signalTimeframe, 1);
-   double openPrice  = iOpen(_Symbol, signalTimeframe, 1);
+    ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+    double closePrice = iClose(_Symbol, signalTimeframe, 1);
+    double openPrice  = iOpen(_Symbol, signalTimeframe, 1);
    double bodySize   = MathAbs(closePrice - openPrice);
    double atr        = atrBuf[1];
 
@@ -287,14 +359,299 @@ int GetSignal()
       recentLow  = MathMin(recentLow, iLow(_Symbol, signalTimeframe, i));
       }
 
-   bool strongMove   = (bodySize >= atr * InpMinBodyATR);
-   bool bullBreakout = (closePrice > recentHigh);
-   bool bearBreakout = (closePrice < recentLow);
+    bool strongMove   = (bodySize >= atr * InpMinBodyATR);
+    bool bullBreakout = (closePrice > recentHigh);
+    bool bearBreakout = (closePrice < recentLow);
 
-   if(bullTrend && strongMove && (bullCross || bullBreakout)) return 1;
-   if(bearTrend && strongMove && (bearCross || bearBreakout)) return -1;
+    bool bullSignal = (bullTrend && strongMove && (bullCross || bullBreakout));
+    bool bearSignal = (bearTrend && strongMove && (bearCross || bearBreakout));
+
+    if(bullSignal)
+      {
+       if(!PassHigherTimeframeBias(1))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: HTF bias is not bullish.");
+         }
+       else if(!PassHigherTimeframeDistanceFilter(1, closePrice, atr))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: buy signal too close to HTF resistance.");
+         }
+       else if(!PassMarketStructureFilter(1))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: bullish market structure confirmation missing.");
+         }
+       else if(!PassLiquiditySweepFilter(1, closePrice, atr))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: no bullish liquidity sweep rejection detected.");
+         }
+       else
+          return 1;
+      }
+
+    if(bearSignal)
+      {
+       if(!PassHigherTimeframeBias(-1))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: HTF bias is not bearish.");
+         }
+       else if(!PassHigherTimeframeDistanceFilter(-1, closePrice, atr))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: sell signal too close to HTF support.");
+         }
+       else if(!PassMarketStructureFilter(-1))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: bearish market structure confirmation missing.");
+         }
+       else if(!PassLiquiditySweepFilter(-1, closePrice, atr))
+         {
+          if(InpDebugLog)
+             Print("BLOCKED: no bearish liquidity sweep rejection detected.");
+         }
+       else
+          return -1;
+      }
+
+    return 0;
+  }
+
+//+------------------------------------------------------------------+
+//| Determine EMA trend bias from the latest closed candle            |
+//+------------------------------------------------------------------+
+int GetTrendBias(ENUM_TIMEFRAMES timeframe, const double &fastBuf[], const double &slowBuf[], const double &trendBuf[])
+  {
+   double closePrice = iClose(_Symbol, timeframe, 1);
+
+   if(closePrice > trendBuf[1] && fastBuf[1] > slowBuf[1] && closePrice > fastBuf[1])
+      return 1;
+
+   if(closePrice < trendBuf[1] && fastBuf[1] < slowBuf[1] && closePrice < fastBuf[1])
+      return -1;
 
    return 0;
+  }
+
+//+------------------------------------------------------------------+
+//| Detect swing high                                                  |
+//+------------------------------------------------------------------+
+bool IsSwingHigh(ENUM_TIMEFRAMES timeframe, int shift, int strength)
+  {
+   if(shift <= strength)
+      return false;
+
+   double candidate = iHigh(_Symbol, timeframe, shift);
+   if(candidate == 0)
+      return false;
+
+   for(int offset = 1; offset <= strength; offset++)
+      {
+       if(candidate <= iHigh(_Symbol, timeframe, shift - offset) ||
+          candidate <= iHigh(_Symbol, timeframe, shift + offset))
+          return false;
+      }
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Detect swing low                                                   |
+//+------------------------------------------------------------------+
+bool IsSwingLow(ENUM_TIMEFRAMES timeframe, int shift, int strength)
+  {
+   if(shift <= strength)
+      return false;
+
+   double candidate = iLow(_Symbol, timeframe, shift);
+   if(candidate == 0)
+      return false;
+
+   for(int offset = 1; offset <= strength; offset++)
+      {
+       if(candidate >= iLow(_Symbol, timeframe, shift - offset) ||
+          candidate >= iLow(_Symbol, timeframe, shift + offset))
+          return false;
+      }
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Find the most recent swing point                                   |
+//+------------------------------------------------------------------+
+bool FindRecentSwing(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength, bool findHigh, double &price, int &shiftFound)
+  {
+   int barsAvailable = iBars(_Symbol, timeframe);
+   int maxShift = lookbackBars + strength;
+   if(barsAvailable <= maxShift + strength)
+      return false;
+
+   for(int shift = strength + 1; shift <= maxShift; shift++)
+      {
+       bool isMatch = findHigh ? IsSwingHigh(timeframe, shift, strength) : IsSwingLow(timeframe, shift, strength);
+       if(isMatch)
+         {
+          price = findHigh ? iHigh(_Symbol, timeframe, shift) : iLow(_Symbol, timeframe, shift);
+          shiftFound = shift;
+          return true;
+         }
+      }
+
+   return false;
+  }
+
+//+------------------------------------------------------------------+
+//| Find the two most recent swings of the same type                   |
+//+------------------------------------------------------------------+
+bool FindRecentSwingPair(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength, bool findHigh,
+                         double &latestPrice, double &previousPrice)
+  {
+   int barsAvailable = iBars(_Symbol, timeframe);
+   int maxShift = lookbackBars + strength;
+   int found = 0;
+
+   if(barsAvailable <= maxShift + strength)
+      return false;
+
+   for(int shift = strength + 1; shift <= maxShift; shift++)
+      {
+       bool isMatch = findHigh ? IsSwingHigh(timeframe, shift, strength) : IsSwingLow(timeframe, shift, strength);
+       if(!isMatch)
+          continue;
+
+       double price = findHigh ? iHigh(_Symbol, timeframe, shift) : iLow(_Symbol, timeframe, shift);
+       if(found == 0)
+          latestPrice = price;
+       else
+         {
+          previousPrice = price;
+          return true;
+         }
+
+       found++;
+      }
+
+   return false;
+  }
+
+//+------------------------------------------------------------------+
+//| Derive directional structure bias from recent swings               |
+//+------------------------------------------------------------------+
+int GetStructureBias(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength)
+  {
+   double latestHigh = 0.0, previousHigh = 0.0;
+   double latestLow  = 0.0, previousLow  = 0.0;
+   bool hasHighs = FindRecentSwingPair(timeframe, lookbackBars, strength, true, latestHigh, previousHigh);
+   bool hasLows  = FindRecentSwingPair(timeframe, lookbackBars, strength, false, latestLow, previousLow);
+   double closePrice = iClose(_Symbol, timeframe, 1);
+
+   bool bullishStructure = hasHighs && hasLows && latestHigh > previousHigh && latestLow > previousLow;
+   bool bearishStructure = hasHighs && hasLows && latestHigh < previousHigh && latestLow < previousLow;
+   bool bullishBreak = hasHighs && closePrice > latestHigh;
+   bool bearishBreak = hasLows && closePrice < latestLow;
+
+   if((bullishStructure || bullishBreak) && !(bearishStructure || bearishBreak))
+      return 1;
+
+   if((bearishStructure || bearishBreak) && !(bullishStructure || bullishBreak))
+      return -1;
+
+   return 0;
+  }
+
+//+------------------------------------------------------------------+
+//| Check higher-timeframe bias                                        |
+//+------------------------------------------------------------------+
+bool PassHigherTimeframeBias(int direction)
+  {
+   if(!InpUseHTFBias)
+      return true;
+
+   ENUM_TIMEFRAMES higherTimeframe = GetHigherTimeframe();
+   int trendBias = GetTrendBias(higherTimeframe, htfFastEMABuf, htfSlowEMABuf, htfTrendEMABuf);
+   if(trendBias != direction)
+      return false;
+
+   int structureBias = GetStructureBias(higherTimeframe, InpHTFStructureLookback, InpSwingStrength);
+   return (structureBias == direction);
+  }
+
+//+------------------------------------------------------------------+
+//| Check higher-timeframe support / resistance distance               |
+//+------------------------------------------------------------------+
+bool PassHigherTimeframeDistanceFilter(int direction, double closePrice, double atr)
+  {
+   if(!InpUseHTFSRFilter)
+      return true;
+
+   double minDistance = atr * InpHTFMinDistanceATR;
+   if(minDistance <= 0)
+      return true;
+
+   ENUM_TIMEFRAMES higherTimeframe = GetHigherTimeframe();
+   double level = 0.0;
+   int levelShift = 0;
+
+   if(direction > 0)
+     {
+      if(!FindRecentSwing(higherTimeframe, InpHTFSRLookback, InpSwingStrength, true, level, levelShift))
+         return true;
+      if(level <= closePrice)
+         return true;
+      return ((level - closePrice) >= minDistance);
+     }
+
+   if(!FindRecentSwing(higherTimeframe, InpHTFSRLookback, InpSwingStrength, false, level, levelShift))
+      return true;
+   if(level >= closePrice)
+      return true;
+   return ((closePrice - level) >= minDistance);
+  }
+
+//+------------------------------------------------------------------+
+//| Check signal-timeframe market structure                            |
+//+------------------------------------------------------------------+
+bool PassMarketStructureFilter(int direction)
+  {
+   if(!InpUseMarketStructure)
+      return true;
+
+   int structureBias = GetStructureBias(GetSignalTimeframe(), InpStructureLookback, InpSwingStrength);
+   return (structureBias == direction);
+  }
+
+//+------------------------------------------------------------------+
+//| Check optional liquidity sweep confirmation                        |
+//+------------------------------------------------------------------+
+bool PassLiquiditySweepFilter(int direction, double closePrice, double atr)
+  {
+   if(!InpUseLiquiditySweep)
+      return true;
+
+   double reclaimDistance = atr * InpLiquiditySweepRejectATR;
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   double level = 0.0;
+   int levelShift = 0;
+
+   if(direction > 0)
+     {
+      if(!FindRecentSwing(signalTimeframe, InpLiquiditySweepLookback, InpSwingStrength, false, level, levelShift))
+         return false;
+
+      double candleLow = iLow(_Symbol, signalTimeframe, 1);
+      return (candleLow < level && closePrice > (level + reclaimDistance));
+     }
+
+   if(!FindRecentSwing(signalTimeframe, InpLiquiditySweepLookback, InpSwingStrength, true, level, levelShift))
+      return false;
+
+   double candleHigh = iHigh(_Symbol, signalTimeframe, 1);
+   return (candleHigh > level && closePrice < (level - reclaimDistance));
   }
 
 //+------------------------------------------------------------------+
@@ -427,11 +784,15 @@ bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
 bool RefreshBuffers()
   {
    int bars = MathMax(InpSignalBars + 3, InpBreakoutLookback + 4);
-   if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
-   if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
-   if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
-   if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
-   return true;
+   bars = MathMax(bars, 3);
+    if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
+    if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
+    if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
+    if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
+    if(CopyBuffer(handleHTFFastEMA,  0, 0, 3, htfFastEMABuf)  < 3) return false;
+    if(CopyBuffer(handleHTFSlowEMA,  0, 0, 3, htfSlowEMABuf)  < 3) return false;
+    if(CopyBuffer(handleHTFTrendEMA, 0, 0, 3, htfTrendEMABuf) < 3) return false;
+    return true;
   }
 
 //+------------------------------------------------------------------+

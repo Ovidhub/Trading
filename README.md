@@ -1,7 +1,7 @@
 # XAUUSD EA — Deriv / MetaTrader 5
 
 An MQL5 Expert Advisor for **XAUUSD (Gold)** on the **Deriv / MetaTrader 5** platform.  
-Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, with **fixed-dollar risk sizing** and automatic lot sizing.
+Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fixed-dollar risk sizing**, and optional higher-timeframe structure filters.
 
 ---
 
@@ -9,13 +9,17 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, with
 
 | Component | Description |
 |-----------|-------------|
-| Entry | Trade with trend alignment plus either a fresh EMA crossover or a breakout candle that closes beyond recent structure |
-| Trend filter | Price must be on the correct side of the 200 EMA |
+| Core trigger | Trade with signal-timeframe trend alignment plus either a fresh EMA crossover or a breakout candle that closes beyond recent structure |
+| Higher-timeframe bias | Optional directional filter requiring bullish/bearish EMA trend and matching structure on a configurable higher timeframe |
+| Higher-timeframe S/R | Optional distance filter that blocks longs too close to HTF resistance and shorts too close to HTF support |
+| Market structure | Optional signal-timeframe confirmation using higher highs / higher lows, lower highs / lower lows, or a recent break of structure |
+| Liquidity sweep | Optional confirmation that looks for a sweep of recent swing liquidity followed by rejection back through the level |
 | Stop Loss | 1.2 × ATR(14) from entry |
 | Take Profit | 2.4 × ATR(14) from entry (≈ 1:2 RR) |
 | Risk per trade | Fixed **$3** risk by default |
 | Session | Disabled by default; optional if you want to restrict trading hours |
-| Timeframe | **M5** by default for faster execution (configurable) |
+| Signal timeframe | **M5** by default for faster execution (configurable) |
+| Higher timeframe | **H1** by default for directional context and swing-based filters |
 
 ---
 
@@ -59,6 +63,19 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, with
 | `InpSignalBars` | `3` | Bars to scan for a fresh EMA crossover |
 | `InpBreakoutLookback` | `3` | Bars used to define the recent breakout range |
 | `InpMinBodyATR` | `0.20` | Minimum signal candle body as a fraction of ATR |
+| `InpUseHTFBias` | `true` | Require higher-timeframe EMA trend and structure to align with the trade direction |
+| `InpHTFTimeframe` | `H1` | Higher timeframe used for directional bias and HTF swing filters |
+| `InpHTFStructureLookback` | `30` | Bars used to evaluate higher-timeframe structure |
+| `InpUseHTFSRFilter` | `true` | Block entries that are too close to higher-timeframe support/resistance |
+| `InpHTFSRLookback` | `30` | Bars used to locate higher-timeframe swing support/resistance |
+| `InpHTFMinDistanceATR` | `0.50` | Minimum distance to HTF support/resistance, measured in signal ATR multiples |
+| `InpUseMarketStructure` | `true` | Require signal-timeframe structure confirmation before entry |
+| `InpStructureLookback` | `20` | Bars used to evaluate signal-timeframe structure |
+| `InpSwingStrength` | `2` | Pivot strength used for swing-high / swing-low detection |
+| `InpUseLiquiditySweep` | `false` | Require a sweep-and-rejection of recent liquidity before entry |
+| `InpLiquiditySweepLookback` | `12` | Bars used to locate recent liquidity sweeps |
+| `InpLiquiditySweepRejectATR` | `0.10` | Minimum reclaim distance after a sweep, measured in signal ATR multiples |
+| `InpDebugLog` | `false` | Enable detailed logs for blocked signals and trades |
 
 ---
 
@@ -70,6 +87,19 @@ Lot Size = Risk USD ÷ (SL in points × tick value per point per lot)
 ```
 
 If the calculated lot is below the broker minimum, the EA can still use the minimum lot only when the projected loss stays within the configured USD fallback risk limit.
+
+---
+
+## Filter Rollout Notes
+
+- The current implementation adds the phase-one filters only: higher-timeframe bias, higher-timeframe support/resistance distance, market structure, and optional liquidity sweeps.
+- Order-block logic is intentionally left out for now so the strategy remains objective and easier to tune without overfitting.
+- A sensible validation sequence is:
+  1. Baseline EMA/ATR trigger
+  2. Higher-timeframe bias
+  3. Higher-timeframe S/R distance
+  4. Market structure
+  5. Liquidity sweep confirmation
 
 ---
 
