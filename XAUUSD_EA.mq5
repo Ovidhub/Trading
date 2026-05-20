@@ -35,7 +35,7 @@ input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points) to tolerate typical Deriv gold spreads
+input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points)
 input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
 input int      InpSessionStart  = 12;       // Session start hour (UTC)
 input int      InpSessionEnd    = 17;       // Session end hour (UTC)
@@ -185,9 +185,9 @@ void OnTick()
      {
       if(InpDebugLog)
          // Signal requires an EMA crossover aligned with the trend EMA filter.
-          PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
-                      fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
-                      trendEMABuf[1], iClose(_Symbol, signalTimeframe, 1));
+         PrintFormat("NO SIGNAL: fast[1]=%.2f slow[1]=%.2f fast[2]=%.2f slow[2]=%.2f trend=%.2f close=%.2f",
+                     fastEMABuf[1], slowEMABuf[1], fastEMABuf[2], slowEMABuf[2],
+                     trendEMABuf[1], iClose(_Symbol, signalTimeframe, 1));
       return;
      }
 
