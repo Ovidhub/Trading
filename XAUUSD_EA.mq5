@@ -104,20 +104,20 @@ int OnInit()
 
    if(InpSignalBars < 1)
       {
-       Print("ERROR: InpSignalBars must be at least 1.");
-       return INIT_PARAMETERS_INCORRECT;
+      Print("ERROR: InpSignalBars must be at least 1.");
+      return INIT_PARAMETERS_INCORRECT;
       }
 
    if(InpBreakoutLookback < 1)
       {
-       Print("ERROR: InpBreakoutLookback must be at least 1.");
-       return INIT_PARAMETERS_INCORRECT;
+      Print("ERROR: InpBreakoutLookback must be at least 1.");
+      return INIT_PARAMETERS_INCORRECT;
       }
 
    if(InpMinBodyATR <= 0)
       {
-       Print("ERROR: InpMinBodyATR must be greater than zero.");
-       return INIT_PARAMETERS_INCORRECT;
+      Print("ERROR: InpMinBodyATR must be greater than zero.");
+      return INIT_PARAMETERS_INCORRECT;
       }
 
    ArraySetAsSeries(fastEMABuf,  true);
@@ -281,7 +281,7 @@ int GetSignal()
 
    double recentHigh = iHigh(_Symbol, signalTimeframe, 2);
    double recentLow  = iLow(_Symbol, signalTimeframe, 2);
-   for(int i = 2; i < InpBreakoutLookback + 2; i++)
+   for(int i = 3; i < InpBreakoutLookback + 2; i++)
       {
       recentHigh = MathMax(recentHigh, iHigh(_Symbol, signalTimeframe, i));
       recentLow  = MathMin(recentLow, iLow(_Symbol, signalTimeframe, i));
