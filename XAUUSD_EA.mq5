@@ -89,7 +89,7 @@ double         htfFastEMABuf[];
 double         htfSlowEMABuf[];
 double         htfTrendEMABuf[];
 
-const int      MIN_INDICATOR_BUFFER_BARS = 3;
+const int      MIN_REQUIRED_BUFFER_BARS = 3;
 
 //+------------------------------------------------------------------+
 //| Resolve the configured signal timeframe                          |
@@ -402,7 +402,7 @@ bool IsSwingHigh(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iHigh(_Symbol, timeframe, shift);
-   if(candidate == 0)
+   if(candidate <= 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -424,7 +424,7 @@ bool IsSwingLow(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iLow(_Symbol, timeframe, shift);
-   if(candidate == 0)
+   if(candidate <= 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -776,14 +776,14 @@ bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
 bool RefreshBuffers()
   {
    int bars = MathMax(InpSignalBars + 3, InpBreakoutLookback + 4);
-   bars = MathMax(bars, MIN_INDICATOR_BUFFER_BARS);
+   bars = MathMax(bars, MIN_REQUIRED_BUFFER_BARS);
    if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
    if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
    if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
    if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
-   if(CopyBuffer(handleHTFFastEMA,  0, 0, MIN_INDICATOR_BUFFER_BARS, htfFastEMABuf)  < MIN_INDICATOR_BUFFER_BARS) return false;
-   if(CopyBuffer(handleHTFSlowEMA,  0, 0, MIN_INDICATOR_BUFFER_BARS, htfSlowEMABuf)  < MIN_INDICATOR_BUFFER_BARS) return false;
-   if(CopyBuffer(handleHTFTrendEMA, 0, 0, MIN_INDICATOR_BUFFER_BARS, htfTrendEMABuf) < MIN_INDICATOR_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFFastEMA,  0, 0, MIN_REQUIRED_BUFFER_BARS, htfFastEMABuf)  < MIN_REQUIRED_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFSlowEMA,  0, 0, MIN_REQUIRED_BUFFER_BARS, htfSlowEMABuf)  < MIN_REQUIRED_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFTrendEMA, 0, 0, MIN_REQUIRED_BUFFER_BARS, htfTrendEMABuf) < MIN_REQUIRED_BUFFER_BARS) return false;
    return true;
   }
 
