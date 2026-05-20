@@ -102,9 +102,21 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
       }
 
-   if(InpSignalBars < 1 || InpBreakoutLookback < 1 || InpMinBodyATR <= 0)
+   if(InpSignalBars < 1)
       {
-       Print("ERROR: InpSignalBars and InpBreakoutLookback must be at least 1, and InpMinBodyATR must be positive.");
+       Print("ERROR: InpSignalBars must be at least 1.");
+       return INIT_PARAMETERS_INCORRECT;
+      }
+
+   if(InpBreakoutLookback < 1)
+      {
+       Print("ERROR: InpBreakoutLookback must be at least 1.");
+       return INIT_PARAMETERS_INCORRECT;
+      }
+
+   if(InpMinBodyATR <= 0)
+      {
+       Print("ERROR: InpMinBodyATR must be greater than zero.");
        return INIT_PARAMETERS_INCORRECT;
       }
 
@@ -360,8 +372,8 @@ double CalculateLotSize(double slInPoints)
 
       if(minLotRiskUSD > allowedMinLotRiskUSD)
         {
-         Print("Skipped: min lot risk exceeds USD fallback cap. Risk=", DoubleToString(minLotRiskUSD, 2),
-               " USD | Allowed=", DoubleToString(allowedMinLotRiskUSD, 2), " USD");
+         Print("Skipped: min lot fallback risk too high. Risk=", DoubleToString(minLotRiskUSD, 2),
+               " USD | Cap=", DoubleToString(allowedMinLotRiskUSD, 2), " USD");
          return 0;
         }
 
