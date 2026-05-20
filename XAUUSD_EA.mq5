@@ -89,7 +89,7 @@ double         htfFastEMABuf[];
 double         htfSlowEMABuf[];
 double         htfTrendEMABuf[];
 
-const int      MIN_REQUIRED_BUFFER_BARS = 3;
+const int      MIN_BUFFER_BARS = 3;
 
 //+------------------------------------------------------------------+
 //| Resolve the configured signal timeframe                          |
@@ -166,6 +166,8 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
       }
 
+   // A confirmed swing needs bars on both sides of the pivot plus room for the
+   // current closed candle to reference that structure safely.
    if(InpHTFStructureLookback < (InpSwingStrength + 2) ||
       InpHTFSRLookback < (InpSwingStrength + 2) ||
       InpStructureLookback < (InpSwingStrength + 2) ||
@@ -402,7 +404,7 @@ bool IsSwingHigh(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iHigh(_Symbol, timeframe, shift);
-   if(candidate <= 0)
+   if(candidate < 0 || candidate == 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -424,7 +426,7 @@ bool IsSwingLow(ENUM_TIMEFRAMES timeframe, int shift, int strength)
       return false;
 
    double candidate = iLow(_Symbol, timeframe, shift);
-   if(candidate <= 0)
+   if(candidate < 0 || candidate == 0)
       return false;
 
    for(int offset = 1; offset <= strength; offset++)
@@ -444,6 +446,8 @@ bool FindRecentSwing(ENUM_TIMEFRAMES timeframe, int lookbackBars, int strength, 
   {
    int barsAvailable = iBars(_Symbol, timeframe);
    int maxShift = lookbackBars + strength;
+   // maxShift already includes one side of the swing; the extra strength keeps
+   // shift + offset reads in-bounds for the oldest eligible pivot.
    if(barsAvailable <= maxShift + strength)
       return false;
 
@@ -471,6 +475,8 @@ bool FindRecentSwingPair(ENUM_TIMEFRAMES timeframe, int lookbackBars, int streng
    int maxShift = lookbackBars + strength;
    int found = 0;
 
+   // maxShift already includes one side of the swing; the extra strength keeps
+   // shift + offset reads in-bounds for the oldest eligible pivot.
    if(barsAvailable <= maxShift + strength)
       return false;
 
@@ -776,14 +782,14 @@ bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
 bool RefreshBuffers()
   {
    int bars = MathMax(InpSignalBars + 3, InpBreakoutLookback + 4);
-   bars = MathMax(bars, MIN_REQUIRED_BUFFER_BARS);
+   bars = MathMax(bars, MIN_BUFFER_BARS);
    if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
    if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
    if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
    if(CopyBuffer(handleATR,      0, 0, bars, atrBuf)      < bars) return false;
-   if(CopyBuffer(handleHTFFastEMA,  0, 0, MIN_REQUIRED_BUFFER_BARS, htfFastEMABuf)  < MIN_REQUIRED_BUFFER_BARS) return false;
-   if(CopyBuffer(handleHTFSlowEMA,  0, 0, MIN_REQUIRED_BUFFER_BARS, htfSlowEMABuf)  < MIN_REQUIRED_BUFFER_BARS) return false;
-   if(CopyBuffer(handleHTFTrendEMA, 0, 0, MIN_REQUIRED_BUFFER_BARS, htfTrendEMABuf) < MIN_REQUIRED_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFFastEMA,  0, 0, MIN_BUFFER_BARS, htfFastEMABuf)  < MIN_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFSlowEMA,  0, 0, MIN_BUFFER_BARS, htfSlowEMABuf)  < MIN_BUFFER_BARS) return false;
+   if(CopyBuffer(handleHTFTrendEMA, 0, 0, MIN_BUFFER_BARS, htfTrendEMABuf) < MIN_BUFFER_BARS) return false;
    return true;
   }
 
