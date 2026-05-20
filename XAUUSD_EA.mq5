@@ -1,13 +1,13 @@
 //+------------------------------------------------------------------+
 //|                                                    XAUUSD_EA.mq5 |
 //|                                          Ovidhub/Trading (2026)  |
-//|  Strategy : EMA trend filter + ATR-based SL/TP                   |
-//|  Risk      : Balance-aware risk cap for small accounts            |
+//|  Strategy : EMA trend breakout + ATR-based SL/TP                 |
+//|  Risk      : Fixed-dollar risk with auto lot sizing               |
 //|  Platform  : Deriv / MetaTrader 5                                 |
 //|  Symbol    : XAUUSD                                               |
 //+------------------------------------------------------------------+
 #property copyright "Ovidhub/Trading"
-#property version   "1.12"
+#property version   "1.13"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -16,12 +16,12 @@
 //--- Input parameters
 input group "=== Risk Management ==="
 input double   InpRiskUSD       = 3.0;      // Max risk cap per trade (USD)
-input double   InpRiskPercent   = 5.0;      // Risk as % of equity (used up to USD cap)
+input double   InpRiskPercent   = 0.0;      // Optional % risk, only used when USD risk is zero
 input double   InpMaxLotSize    = 5.0;      // Maximum lot size cap
 input double   InpMinLotSize    = 0.01;     // Minimum lot size
 input bool     InpAllowMinLotFallback = true; // Allow broker min lot when risk stays reasonable
-input double   InpMaxMinLotRiskPct = 6.0;  // Max equity risk allowed for min-lot fallback
-input double   InpMinFreeMarginUSD = 10.0; // Keep this free margin after entry
+input double   InpMaxMinLotRiskUSD = 3.0;  // Max USD risk allowed for min-lot fallback
+input double   InpMinFreeMarginUSD = 0.0;  // Keep this free margin after entry
 
 input group "=== EMA Settings ==="
 input int      InpFastEMA       = 21;       // Fast EMA period
@@ -35,14 +35,16 @@ input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points)
-input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
+input int      InpMaxSpreadPts  = 0;        // Max allowed spread (points), 0 disables the filter
+input bool     InpTradeSession  = false;    // Filter by London/NY overlap session
 input int      InpSessionStart  = 12;       // Session start hour (UTC)
 input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
 input group "=== Signal Settings ==="
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT; // Signal timeframe
-input int      InpSignalBars    = 2;        // Closed-bar confirmation window, including the crossover bar
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M5; // Signal timeframe
+input int      InpSignalBars    = 3;        // Bars to scan for a fresh EMA crossover
+input int      InpBreakoutLookback = 3;     // Bars used to detect breakout opportunity
+input double   InpMinBodyATR    = 0.20;     // Minimum signal candle body as ATR fraction
 
 input group "=== Debug ==="
 input bool     InpDebugLog      = false;    // Enable diagnostic logging for blocked trades and signals
@@ -100,10 +102,10 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
       }
 
-   if(InpSignalBars < 1)
+   if(InpSignalBars < 1 || InpBreakoutLookback < 1 || InpMinBodyATR <= 0)
       {
-      Print("ERROR: InpSignalBars must be at least 1.");
-      return INIT_PARAMETERS_INCORRECT;
+       Print("ERROR: InpSignalBars and InpBreakoutLookback must be at least 1, and InpMinBodyATR must be positive.");
+       return INIT_PARAMETERS_INCORRECT;
       }
 
    ArraySetAsSeries(fastEMABuf,  true);
@@ -144,7 +146,7 @@ void OnTick()
 
    // Check spread
    long spreadPoints = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
-   if(spreadPoints > InpMaxSpreadPts)
+    if(InpMaxSpreadPts > 0 && spreadPoints > InpMaxSpreadPts)
      {
       if(InpDebugLog)
          Print("BLOCKED: spread=", spreadPoints, " pts (max ", InpMaxSpreadPts, ")");
@@ -233,47 +235,46 @@ void OnTick()
 //+------------------------------------------------------------------+
 int GetSignal()
   {
-   int confirmationWindowStart = InpSignalBars;
-   double trendNow = trendEMABuf[1];
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   double closePrice = iClose(_Symbol, signalTimeframe, 1);
+   double openPrice  = iOpen(_Symbol, signalTimeframe, 1);
+   double bodySize   = MathAbs(closePrice - openPrice);
+   double atr        = atrBuf[1];
 
-   // Trend filter: price (close) must be above/below 200 EMA
-   double closePrice = iClose(_Symbol, GetSignalTimeframe(), 1);
+   if(atr <= 0)
+      return 0;
 
-   bool bullTrend = (closePrice > trendNow);
-   bool bearTrend = (closePrice < trendNow);
+   bool bullTrend = (closePrice > trendEMABuf[1] &&
+                     fastEMABuf[1] > slowEMABuf[1] &&
+                     closePrice > fastEMABuf[1]);
+   bool bearTrend = (closePrice < trendEMABuf[1] &&
+                     fastEMABuf[1] < slowEMABuf[1] &&
+                     closePrice < fastEMABuf[1]);
 
-   // EMA crossover must happen on the confirmation window's oldest bar and remain intact.
-   bool bullCross = (fastEMABuf[confirmationWindowStart + 1] <= slowEMABuf[confirmationWindowStart + 1]) &&
-                    (fastEMABuf[confirmationWindowStart] > slowEMABuf[confirmationWindowStart]);
-   bool bearCross = (fastEMABuf[confirmationWindowStart + 1] >= slowEMABuf[confirmationWindowStart + 1]) &&
-                    (fastEMABuf[confirmationWindowStart] < slowEMABuf[confirmationWindowStart]);
-
-   if(bullCross)
+   bool bullCross = false;
+   bool bearCross = false;
+   for(int i = 1; i <= InpSignalBars; i++)
      {
-      for(int i = confirmationWindowStart - 1; i >= 1; i--)
-        {
-         if(fastEMABuf[i] <= slowEMABuf[i])
-           {
-            bullCross = false;
-            break;
-           }
-        }
+      if(fastEMABuf[i + 1] <= slowEMABuf[i + 1] && fastEMABuf[i] > slowEMABuf[i])
+         bullCross = true;
+      if(fastEMABuf[i + 1] >= slowEMABuf[i + 1] && fastEMABuf[i] < slowEMABuf[i])
+         bearCross = true;
      }
 
-   if(bearCross)
+   double recentHigh = iHigh(_Symbol, signalTimeframe, 2);
+   double recentLow  = iLow(_Symbol, signalTimeframe, 2);
+   for(int i = 3; i < InpBreakoutLookback + 2; i++)
      {
-      for(int i = confirmationWindowStart - 1; i >= 1; i--)
-        {
-         if(fastEMABuf[i] >= slowEMABuf[i])
-           {
-            bearCross = false;
-            break;
-           }
-        }
+      recentHigh = MathMax(recentHigh, iHigh(_Symbol, signalTimeframe, i));
+      recentLow  = MathMin(recentLow, iLow(_Symbol, signalTimeframe, i));
      }
 
-   if(bullCross && bullTrend) return 1;
-   if(bearCross && bearTrend) return -1;
+   bool strongMove   = (bodySize >= atr * InpMinBodyATR);
+   bool bullBreakout = (closePrice > recentHigh);
+   bool bearBreakout = (closePrice < recentLow);
+
+   if(bullTrend && strongMove && (bullCross || bullBreakout)) return 1;
+   if(bearTrend && strongMove && (bearCross || bearBreakout)) return -1;
 
    return 0;
   }
@@ -291,16 +292,11 @@ double PercentOf(double value, double percent)
 //+------------------------------------------------------------------+
 double GetRiskAmountUSD()
   {
-   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
-   double riskPct = PercentOf(equity, InpRiskPercent);
+   if(InpRiskUSD > 0)
+      return InpRiskUSD;
 
-   if(InpRiskPercent > 0 && InpRiskUSD > 0)
-      return MathMin(riskPct, InpRiskUSD);
-
-   if(InpRiskPercent > 0)
-      return riskPct;
-
-   return InpRiskUSD;
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   return PercentOf(equity, InpRiskPercent);
   }
 
 //+------------------------------------------------------------------+
@@ -359,13 +355,12 @@ double CalculateLotSize(double slInPoints)
          return 0;
         }
 
-      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
       double minLotRiskUSD = EstimateRiskUSD(minLot, slInPoints);
-      double allowedMinLotRiskUSD = PercentOf(equity, InpMaxMinLotRiskPct);
+      double allowedMinLotRiskUSD = (InpMaxMinLotRiskUSD > 0) ? InpMaxMinLotRiskUSD : riskUSD;
 
       if(minLotRiskUSD > allowedMinLotRiskUSD)
         {
-         Print("Skipped: min lot risk too high for equity. Risk=", DoubleToString(minLotRiskUSD, 2),
+         Print("Skipped: min lot risk exceeds USD fallback cap. Risk=", DoubleToString(minLotRiskUSD, 2),
                " USD | Allowed=", DoubleToString(allowedMinLotRiskUSD, 2), " USD");
          return 0;
         }
@@ -413,7 +408,7 @@ bool CanAffordTrade(ENUM_ORDER_TYPE orderType, double lots, double price)
 //+------------------------------------------------------------------+
 bool RefreshBuffers()
   {
-   int bars = InpSignalBars + 5;
+   int bars = MathMax(InpSignalBars + 3, InpBreakoutLookback + 4);
    if(CopyBuffer(handleFastEMA,  0, 0, bars, fastEMABuf)  < bars) return false;
    if(CopyBuffer(handleSlowEMA,  0, 0, bars, slowEMABuf)  < bars) return false;
    if(CopyBuffer(handleTrendEMA, 0, 0, bars, trendEMABuf) < bars) return false;
