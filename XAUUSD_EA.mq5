@@ -237,7 +237,7 @@ int GetSignal()
    double trendNow = trendEMABuf[1];
 
    // Trend filter: price (close) must be above/below 200 EMA
-    double closePrice = iClose(_Symbol, GetSignalTimeframe(), 1);
+   double closePrice = iClose(_Symbol, GetSignalTimeframe(), 1);
 
    bool bullTrend = (closePrice > trendNow);
    bool bearTrend = (closePrice < trendNow);
