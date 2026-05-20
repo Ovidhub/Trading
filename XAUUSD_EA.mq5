@@ -7,7 +7,7 @@
 //|  Symbol    : XAUUSD                                               |
 //+------------------------------------------------------------------+
 #property copyright "Ovidhub/Trading"
-#property version   "1.11"
+#property version   "1.12"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -35,13 +35,13 @@ input double   InpTPMultiplier  = 2.4;      // TP = ATR × multiplier (RR ≈ 1:
 
 input group "=== Trade Filters ==="
 input int      InpMagicNumber   = 202600;   // Magic number
-input int      InpMaxSpreadPts  = 35;       // Max allowed spread (points)
+input int      InpMaxSpreadPts  = 80;       // Max allowed spread (points)
 input bool     InpTradeSession  = true;     // Filter by London/NY overlap session
 input int      InpSessionStart  = 12;       // Session start hour (UTC)
 input int      InpSessionEnd    = 17;       // Session end hour (UTC)
 
 input group "=== Signal Settings ==="
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15; // Signal timeframe
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT; // Signal timeframe
 input int      InpSignalBars    = 2;        // Closed-bar confirmation window, including the crossover bar
 
 input group "=== Debug ==="
@@ -101,8 +101,12 @@ int OnInit()
    ArraySetAsSeries(trendEMABuf, true);
    ArraySetAsSeries(atrBuf,      true);
 
+   ENUM_TIMEFRAMES activeTimeframe = (InpTimeframe == PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : InpTimeframe;
+
    Print("XAUUSD EA initialised. Risk cap: $", DoubleToString(InpRiskUSD, 2),
          " | Risk %: ", DoubleToString(InpRiskPercent, 2),
+         " | Signal TF: ", EnumToString(activeTimeframe),
+         " | Chart TF: ", EnumToString((ENUM_TIMEFRAMES)_Period),
          " | Session: ", IntegerToString(InpSessionStart), ":00-", IntegerToString(InpSessionEnd), ":00 UTC");
    return INIT_SUCCEEDED;
   }

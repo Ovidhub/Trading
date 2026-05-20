@@ -15,7 +15,7 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 | Take Profit | 2.4 × ATR(14) from entry (≈ 1:2 RR) |
 | Risk per trade | Equity-based risk with a **$3 hard cap** |
 | Session | London / New York overlap focus (**12:00–17:00 UTC**, configurable) |
-| Timeframe | M15 (configurable) |
+| Timeframe | Current chart timeframe by default (M15 recommended, configurable) |
 
 ---
 
@@ -25,7 +25,7 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 1. Copy `XAUUSD_EA.mq5` to your MT5 `Experts` folder:  
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Experts\`
 2. Open **MetaEditor** → compile the file (F7).
-3. In MT5, open an **XAUUSD M15** chart.
+3. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M15 recommended**).
 4. Drag the EA onto the chart and enable **Algo Trading**.
 
 ### 2. Broker / Account
@@ -51,11 +51,11 @@ Uses an EMA crossover strategy with a trend filter and ATR-based stop loss / tak
 | `InpSLMultiplier` | `1.2` | SL distance = ATR × multiplier |
 | `InpTPMultiplier` | `2.4` | TP distance = ATR × multiplier |
 | `InpMagicNumber` | `202600` | Unique EA identifier |
-| `InpMaxSpreadPts` | `35` | Skip trade if spread exceeds this |
+| `InpMaxSpreadPts` | `80` | Skip trade if spread exceeds this |
 | `InpTradeSession` | `true` | Enable session filter |
 | `InpSessionStart` | `12` | Session start (UTC hour) |
 | `InpSessionEnd` | `17` | Session end (UTC hour) |
-| `InpTimeframe` | `M15` | Signal timeframe |
+| `InpTimeframe` | `CURRENT` | Signal timeframe (`CURRENT` uses the chart timeframe) |
 | `InpSignalBars` | `2` | Size of the closed-bar confirmation window for the EMA crossover, including the crossover bar |
 
 ---
