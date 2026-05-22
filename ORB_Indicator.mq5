@@ -61,7 +61,7 @@ input int      InpSessionStartHour   = 9;     // Session start hour (server time
 input int      InpSessionStartMinute = 30;    // Session start minute (server time)
 input int      InpOpenRangeMinutes   = 15;    // Opening range length in minutes
 input bool     InpShowRangeBeforeClose = false; // Plot levels before range completes
-input ENUM_TIMEFRAMES InpSignalTimeframe = PERIOD_M5; // Execution timeframe
+input ENUM_TIMEFRAMES InpSignalTimeframe = PERIOD_M5; // Execution timeframe (M5/M15 only)
 
 input group "=== Volume Profile ==="
 input double   InpValueAreaPercent   = 0.70;  // Value area percent (0-1)
@@ -97,6 +97,14 @@ ENUM_TIMEFRAMES GetSignalTimeframe()
    if(timeframe == PERIOD_CURRENT)
       timeframe = (ENUM_TIMEFRAMES)_Period;
    return timeframe;
+  }
+
+//+------------------------------------------------------------------+
+//| Validate supported timeframes                                     |
+//+------------------------------------------------------------------+
+bool IsAllowedTimeframe(ENUM_TIMEFRAMES timeframe)
+  {
+   return (timeframe == PERIOD_M5 || timeframe == PERIOD_M15);
   }
 
 //+------------------------------------------------------------------+
@@ -397,6 +405,14 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
      }
 
+   ENUM_TIMEFRAMES signalTimeframe = GetSignalTimeframe();
+   ENUM_TIMEFRAMES chartTimeframe = (ENUM_TIMEFRAMES)_Period;
+   if(!IsAllowedTimeframe(signalTimeframe) || !IsAllowedTimeframe(chartTimeframe))
+     {
+     Print("ERROR: ORB indicator supports only M5 and M15 timeframes.");
+     return INIT_PARAMETERS_INCORRECT;
+     }
+
    IndicatorSetString(INDICATOR_SHORTNAME, "ORB Value Area Indicator");
    return INIT_SUCCEEDED;
   }
@@ -522,14 +538,14 @@ int OnCalculate(const int rates_total,
 
       double closePrice = iClose(_Symbol, signalTimeframe, shift);
 
-      bool insideValueArea = (closePrice >= val && closePrice <= vah);
-      bool breakoutBuy = InpShowBreakoutSignals && closePrice > vah;
-      bool breakoutSell = InpShowBreakoutSignals && closePrice < val;
+      bool insideOrbRange = (closePrice >= orbLow && closePrice <= orbHigh);
+      bool breakoutBuy = InpShowBreakoutSignals && closePrice > orbHigh;
+      bool breakoutSell = InpShowBreakoutSignals && closePrice < orbLow;
 
       bool fakeoutBuy = false;
       bool fakeoutSell = false;
 
-      if(InpShowFakeoutSignals && insideValueArea)
+      if(InpShowFakeoutSignals && insideOrbRange)
         {
          for(int lookback = 1; lookback <= InpFakeoutLookbackBars; lookback++)
            {
@@ -540,9 +556,9 @@ int OnCalculate(const int rates_total,
             double prevHigh = iHigh(_Symbol, signalTimeframe, prevShift);
             double prevLow = iLow(_Symbol, signalTimeframe, prevShift);
 
-            if(prevHigh > orbHigh && prevClose > vah)
+            if(prevHigh > orbHigh && prevClose > orbHigh)
                fakeoutSell = true;
-            if(prevLow < orbLow && prevClose < val)
+            if(prevLow < orbLow && prevClose < orbLow)
                fakeoutBuy = true;
            }
         }
