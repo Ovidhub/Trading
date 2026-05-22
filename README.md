@@ -21,6 +21,13 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
 | Signal timeframe | **M5** by default for faster execution (configurable) |
 | Higher timeframe | **H1** by default for directional context and swing-based filters |
 
+### Trading Rules (Indicator + EA)
+1. **Trend alignment**: price is on the correct side of the trend EMA, with fast EMA above/below the slow EMA for buys/sells.
+2. **Trigger**: a fresh EMA crossover within the last `InpSignalBars` bars **or** a breakout close beyond the recent high/low range (`InpBreakoutLookback`).
+3. **Momentum check**: the signal candle body is at least `InpMinBodyATR × ATR`.
+4. **Optional filters** (if enabled): higher-timeframe EMA + structure bias, HTF support/resistance distance, signal-timeframe structure confirmation, and liquidity-sweep rejection.
+5. **Risk model (EA only)**: SL = `InpSLMultiplier × ATR`, TP = `InpTPMultiplier × ATR` with fixed-dollar risk sizing.
+
 ---
 
 ## Setup
@@ -28,9 +35,12 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
 ### 1. Install
 1. Copy `XAUUSD_EA.mq5` to your MT5 `Experts` folder:  
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Experts\`
-2. Open **MetaEditor** → compile the file (F7).
-3. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
-4. Drag the EA onto the chart and enable **Algo Trading**.
+1. Copy `XAUUSD_Indicator.mq5` to your MT5 `Indicators` folder (for chart signals):  
+   `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Indicators\`
+1. Open **MetaEditor** → compile the file (F7).
+1. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
+1. Drag the EA onto the chart and enable **Algo Trading**.
+1. (Optional) Attach **XAUUSD Signal Indicator** to visualize buy/sell arrows.
 
 ### 2. Broker / Account
 - Broker: **Deriv** (MT5 account)
@@ -118,3 +128,4 @@ These settings still do not guarantee growth and do not protect against slippage
 | File | Description |
 |------|-------------|
 | `XAUUSD_EA.mq5` | Main Expert Advisor source code |
+| `XAUUSD_Indicator.mq5` | Signal indicator that plots buy/sell arrows based on the same rules |
