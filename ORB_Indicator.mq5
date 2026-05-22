@@ -73,6 +73,10 @@ input bool     InpShowFakeoutSignals  = true; // Show fakeout arrows
 input int      InpFakeoutLookbackBars = 1;    // Bars after sweep to accept fakeout
 input double   InpArrowOffsetPoints   = 20.0; // Arrow offset in points
 
+//--- Arrow codes
+const int ARROW_UP = 233;
+const int ARROW_DOWN = 234;
+
 //--- Indicator buffers
 double orbHighBuf[];
 double orbLowBuf[];
@@ -180,8 +184,8 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
    ArrayResize(lows, openRangeBars);
    ArrayResize(volumes, openRangeBars);
 
-   orbHigh = -DBL_MAX;
-   orbLow = DBL_MAX;
+   orbHigh = iHigh(_Symbol, timeframe, startShift);
+   orbLow = iLow(_Symbol, timeframe, startShift);
 
    int idx = 0;
    for(int shift = startShift; shift >= endShift; shift--)
@@ -197,7 +201,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       idx++;
      }
 
-   if(orbHigh == -DBL_MAX || orbLow == DBL_MAX)
+   if(orbHigh == 0.0 && orbLow == 0.0)
       return false;
 
    if(orbHigh == orbLow)
@@ -327,10 +331,10 @@ double GetArrowOffset()
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   PlotIndexSetInteger(5, PLOT_ARROW, 233);
-   PlotIndexSetInteger(6, PLOT_ARROW, 234);
-   PlotIndexSetInteger(7, PLOT_ARROW, 233);
-   PlotIndexSetInteger(8, PLOT_ARROW, 234);
+   PlotIndexSetInteger(5, PLOT_ARROW, ARROW_UP);
+   PlotIndexSetInteger(6, PLOT_ARROW, ARROW_DOWN);
+   PlotIndexSetInteger(7, PLOT_ARROW, ARROW_UP);
+   PlotIndexSetInteger(8, PLOT_ARROW, ARROW_DOWN);
 
    for(int i = 0; i < 9; i++)
       PlotIndexSetDouble(i, PLOT_EMPTY_VALUE, EMPTY_VALUE);
@@ -539,10 +543,15 @@ int OnCalculate(const int rates_total,
       if(chartShift < 0 || chartShift >= rates_total)
          continue;
 
-      if(breakoutBuy && !fakeoutBuy && !fakeoutSell)
-         breakoutBuyBuf[chartShift] = iLow(_Symbol, chartTimeframe, chartShift) - arrowOffset;
-      if(breakoutSell && !fakeoutBuy && !fakeoutSell)
-         breakoutSellBuf[chartShift] = iHigh(_Symbol, chartTimeframe, chartShift) + arrowOffset;
+      bool suppressBreakout = (fakeoutBuy || fakeoutSell);
+
+      if(!suppressBreakout)
+        {
+         if(breakoutBuy)
+            breakoutBuyBuf[chartShift] = iLow(_Symbol, chartTimeframe, chartShift) - arrowOffset;
+         if(breakoutSell)
+            breakoutSellBuf[chartShift] = iHigh(_Symbol, chartTimeframe, chartShift) + arrowOffset;
+        }
 
       if(fakeoutBuy)
          fakeoutBuyBuf[chartShift] = iLow(_Symbol, chartTimeframe, chartShift) - arrowOffset;
