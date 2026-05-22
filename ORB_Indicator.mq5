@@ -188,6 +188,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
    orbLow = iLow(_Symbol, timeframe, startShift);
 
    int idx = 0;
+   bool loggedInvalidBar = false;
    for(int shift = startShift; shift >= endShift; shift--)
      {
       double high = iHigh(_Symbol, timeframe, shift);
@@ -201,7 +202,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       idx++;
      }
 
-   if(orbHigh == 0.0 && orbLow == 0.0)
+   if(orbHigh < orbLow)
       return false;
 
    if(orbHigh == orbLow)
@@ -236,7 +237,14 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       double barLow = lows[i];
       double barVol = volumes[i];
       if(barHigh < barLow)
+        {
+         if(!loggedInvalidBar)
+           {
+            PrintFormat("WARNING: Invalid bar data detected in opening range (high < low).");
+            loggedInvalidBar = true;
+           }
          continue;
+        }
       int startBin = (int)MathFloor((barLow - orbLow) / step);
       int endBin = (int)MathFloor((barHigh - orbLow) / step);
       startBin = MathMax(0, startBin);
@@ -281,7 +289,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
    if(binCount > 1)
       SortDescending(vols, indices, 0, binCount - 1);
 
-   double target = totalVolume * InpValueAreaPercent;
+   double valueAreaVolumeThreshold = totalVolume * InpValueAreaPercent;
    double cumulative = 0.0;
    int minIndex = pocIndex;
    int maxIndex = pocIndex;
@@ -291,7 +299,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       cumulative += vols[i];
       minIndex = MathMin(minIndex, indices[i]);
       maxIndex = MathMax(maxIndex, indices[i]);
-      if(cumulative >= target)
+      if(cumulative >= valueAreaVolumeThreshold)
          break;
      }
 
