@@ -89,7 +89,10 @@ double fakeoutSellBuf[];
 //+------------------------------------------------------------------+
 ENUM_TIMEFRAMES GetSignalTimeframe()
   {
-   return (InpSignalTimeframe == PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : InpSignalTimeframe;
+   ENUM_TIMEFRAMES timeframe = InpSignalTimeframe;
+   if(timeframe == PERIOD_CURRENT)
+      timeframe = (ENUM_TIMEFRAMES)_Period;
+   return timeframe;
   }
 
 //+------------------------------------------------------------------+
@@ -231,7 +234,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       int span = endBin - startBin + 1;
       if(span <= 0)
          continue;
-      double volPerBin = (span > 0) ? (barVol / span) : 0.0;
+      double volPerBin = barVol / span;
       for(int b = startBin; b <= endBin; b++)
          bins[b] += volPerBin;
      }
