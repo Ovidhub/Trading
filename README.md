@@ -44,6 +44,7 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
 7. (Optional) Attach **XAUUSD Signal Indicator** or **ORB Value Area Indicator** to visualize signals.
 
 > **Note:** The ORB indicator session inputs (`InpSessionStartHour` / `InpSessionStartMinute`) use your broker's server time.
+> **Note:** The ORB indicator is intended for **M5** and **M15** charts/timeframes only.
 
 ### 2. Broker / Account
 - Broker: **Deriv** (MT5 account)
