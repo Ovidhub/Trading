@@ -123,7 +123,7 @@ int GetOpenRangeBars(ENUM_TIMEFRAMES timeframe)
    int tfSeconds = PeriodSeconds(timeframe);
    if(tfSeconds <= 0)
      {
-      Print("ERROR: Invalid signal timeframe; cannot compute opening range bars.");
+      PrintFormat("ERROR: Invalid signal timeframe (%d); cannot compute opening range bars.", (int)timeframe);
       return 0;
      }
    double barsExact = (double)InpOpenRangeMinutes * 60.0 / (double)tfSeconds;
@@ -218,7 +218,7 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
    double step = tickSize * MathMax(1, InpTicksPerRow);
    if(step <= 0)
      {
-      Print("ERROR: Invalid tick size or row size; cannot compute volume profile.");
+      PrintFormat("ERROR: Invalid tick size or row size; tickSize=%.8f step=%.8f.", tickSize, step);
       return false;
      }
 
@@ -379,7 +379,7 @@ int OnInit()
 
    if(InpValueAreaPercent <= 0.0 || InpValueAreaPercent > 1.0)
      {
-      Print("ERROR: InpValueAreaPercent must be between 0 and 1.");
+      Print("ERROR: InpValueAreaPercent must be greater than 0 and at most 1.");
       return INIT_PARAMETERS_INCORRECT;
      }
 
