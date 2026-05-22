@@ -37,10 +37,13 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Experts\`
 2. Copy `XAUUSD_Indicator.mq5` to your MT5 `Indicators` folder (for chart signals):  
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Indicators\`
-3. Open **MetaEditor** → compile the file (F7).
-4. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
-5. Drag the EA onto the chart and enable **Algo Trading**.
-6. (Optional) Attach **XAUUSD Signal Indicator** to visualize buy/sell arrows.
+3. Copy `ORB_Indicator.mq5` to your MT5 `Indicators` folder if you want the opening range indicator.
+4. Open **MetaEditor** → compile the file (F7).
+5. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
+6. Drag the EA onto the chart and enable **Algo Trading**.
+7. (Optional) Attach **XAUUSD Signal Indicator** or **ORB Value Area Indicator** to visualize signals.
+
+> **Note:** The ORB indicator session inputs (`InpSessionStartHour` / `InpSessionStartMinute`) use your broker's server time.
 
 ### 2. Broker / Account
 - Broker: **Deriv** (MT5 account)
@@ -129,3 +132,4 @@ These settings still do not guarantee growth and do not protect against slippage
 |------|-------------|
 | `XAUUSD_EA.mq5` | Main Expert Advisor source code |
 | `XAUUSD_Indicator.mq5` | Signal indicator that plots buy/sell arrows based on the same rules |
+| `ORB_Indicator.mq5` | Opening range breakout indicator with value-area levels and signals |
