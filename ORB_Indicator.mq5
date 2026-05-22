@@ -118,7 +118,10 @@ int GetOpenRangeBars(ENUM_TIMEFRAMES timeframe)
   {
    int tfSeconds = PeriodSeconds(timeframe);
    if(tfSeconds <= 0)
+     {
+      Print("ERROR: Invalid signal timeframe; cannot compute opening range bars.");
       return 0;
+     }
    double barsExact = (double)InpOpenRangeMinutes * 60.0 / (double)tfSeconds;
    int bars = (int)MathCeil(barsExact);
    return MathMax(1, bars);
@@ -210,7 +213,10 @@ bool ComputeSessionLevels(datetime sessionStart, ENUM_TIMEFRAMES timeframe, int 
       tickSize = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
    double step = tickSize * MathMax(1, InpTicksPerRow);
    if(step <= 0)
+     {
+      Print("ERROR: Invalid tick size or row size; cannot compute volume profile.");
       return false;
+     }
 
    int binCount = (int)MathCeil((orbHigh - orbLow) / step) + 1;
    if(binCount < 1)

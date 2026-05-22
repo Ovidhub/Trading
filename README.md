@@ -43,6 +43,8 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
 6. Drag the EA onto the chart and enable **Algo Trading**.
 7. (Optional) Attach **XAUUSD Signal Indicator** or **ORB Value Area Indicator** to visualize signals.
 
+> **Note:** The ORB indicator session inputs (`InpSessionStartHour` / `InpSessionStartMinute`) use your broker's server time.
+
 ### 2. Broker / Account
 - Broker: **Deriv** (MT5 account)
 - Symbol: `XAUUSD` (verify the exact symbol name — may be `XAUUSD.` or `Gold`)
