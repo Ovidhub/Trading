@@ -537,17 +537,15 @@ int OnCalculate(const int rates_total,
       double poc = sessionPOCs[sessionIndex];
 
       double closePrice = iClose(_Symbol, signalTimeframe, shift);
-      double highPrice = iHigh(_Symbol, signalTimeframe, shift);
-      double lowPrice = iLow(_Symbol, signalTimeframe, shift);
 
-      bool insideRange = (closePrice >= orbLow && closePrice <= orbHigh);
-      bool breakoutBuy = InpShowBreakoutSignals && closePrice > orbHigh && highPrice > orbHigh;
-      bool breakoutSell = InpShowBreakoutSignals && closePrice < orbLow && lowPrice < orbLow;
+      bool insideOrbRange = (closePrice >= orbLow && closePrice <= orbHigh);
+      bool breakoutBuy = InpShowBreakoutSignals && closePrice > orbHigh;
+      bool breakoutSell = InpShowBreakoutSignals && closePrice < orbLow;
 
       bool fakeoutBuy = false;
       bool fakeoutSell = false;
 
-      if(InpShowFakeoutSignals && insideRange)
+      if(InpShowFakeoutSignals && insideOrbRange)
         {
          for(int lookback = 1; lookback <= InpFakeoutLookbackBars; lookback++)
            {
