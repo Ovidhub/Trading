@@ -35,12 +35,12 @@ Uses an EMA/trend breakout strategy with ATR-based stop loss / take profit, **fi
 ### 1. Install
 1. Copy `XAUUSD_EA.mq5` to your MT5 `Experts` folder:  
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Experts\`
-1. Copy `XAUUSD_Indicator.mq5` to your MT5 `Indicators` folder (for chart signals):  
+2. Copy `XAUUSD_Indicator.mq5` to your MT5 `Indicators` folder (for chart signals):  
    `C:\Users\<YourUser>\AppData\Roaming\MetaQuotes\Terminal\<ID>\MQL5\Indicators\`
-1. Open **MetaEditor** → compile the file (F7).
-1. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
-1. Drag the EA onto the chart and enable **Algo Trading**.
-1. (Optional) Attach **XAUUSD Signal Indicator** to visualize buy/sell arrows.
+3. Open **MetaEditor** → compile the file (F7).
+4. In MT5, open an **XAUUSD** chart on your preferred timeframe (**M5 default**).
+5. Drag the EA onto the chart and enable **Algo Trading**.
+6. (Optional) Attach **XAUUSD Signal Indicator** to visualize buy/sell arrows.
 
 ### 2. Broker / Account
 - Broker: **Deriv** (MT5 account)
